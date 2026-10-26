@@ -42,7 +42,7 @@ Notes from our own client edits, added the same way:
 | Note | What the skill does now |
 |---|---|
 | "The font on REAL ESTATE STRATEGIST feels lost." (name title subtitle in a different font from everything else) | One type family across the name title, its subtitle, captions, and graphic titles. Vary weight, size, and letter-spacing for hierarchy, never a second unrelated font. |
-| "Add a pause after 'short hold' so viewers have time to see the graphic." | Each motion graphic gets about 1 s of breathing room after its key word before the next line, longer for comparison panels. Restore the speaker's real pause from the raw first; pad only with matching room tone, never frozen frames. |
+| "Add a pause after 'short hold' so viewers have time to see the graphic." Then: "Not 1 second, 0.5, or as long as viewers can digest." | Each motion graphic gets a short hold after its key word before the next line: start around 0.5 s and give it only as long as a viewer needs to read it (a simple label less, a dense comparison more). Use the speaker's real pause from the raw; pad only with matching room tone, never frozen frames. |
 | "There's a glitch on some cuts, 1 frame before the motion graphic comes in." | Cut points and graphic start times sit on the same frame grid. Frame strips are checked at every graphic entry and exit, not just at cuts. |
 | "When there's a jump cut, add a bit of zoom to hide the cut." | Every jump cut on the speaker alternates framing with a hard punch-in (about 8 to 12% tighter) on the cut frame. Face stays well framed and captions stay off the mouth. Cuts covered by a full-screen graphic are skipped. |
 

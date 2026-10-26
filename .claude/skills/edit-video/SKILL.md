@@ -13,7 +13,7 @@ for structure, CTA, and proof. If a direction is
 missing, propose a style from `style-library/registry.json` based on the footage.
 
 Read `docs/EDITING-PLAYBOOK.md` for the house rules learned from review notes
-(jump-cut punch-ins, graphic breathing room, one type family, frame-grid timing).
+(jump-cut punch-ins, a short hold (~0.5 s) after each graphic's key word, one type family, frame-grid timing).
 
 1. Inspect duration, streams, and source resolution with ffprobe. Copy the source
    into the project's assets or reference an explicitly provided local path.
