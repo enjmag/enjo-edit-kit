@@ -148,6 +148,8 @@ The agent checks its own work before you see it:
 - **Frame strips** across every cut (10 frames each side). They catch one-frame empty panels and captions flashing over the wrong shot that single screenshots miss.
 - **Graphic entries and exits:** a frame strip at every graphic in and out. A one-frame flash of the wrong shot before a graphic usually means its start time and the nearest cut fell on different frames.
 - **Jump cuts:** every cut on the speaker either changes framing (punch-in) or is covered by a graphic.
+- **How to find the cuts on the encoded edit:** `ffmpeg -i edit.mp4 -vf "select='gt(scene,0.01)',showinfo" -f null -` lists every cut's frame time. Place graphic edges at that frame time minus half a frame, and snap any graphic edge within about 0.3 s of a cut onto the cut so the cut hides underneath.
+- **Punch-in values that worked:** about 10% tighter than the base framing (one client edit went from 1.25x to 1.38x), transform origin around 50% 30% so the eyes stay in the upper third, reset to the base scale under the next full-screen graphic.
 - **Contrast** behind every caption.
 - **Every word whole:** transcribe the final render and compare the words at every cut with the raw recording. A transcript alone is not proof: speech-to-text guesses a clipped word correctly while a listener hears it broken.
 - **The first second:** read the first 2.5 s frame by frame and the first frame of every face shot. Nothing covers the mouth.
@@ -166,5 +168,8 @@ The agent checks its own work before you see it:
 - Cutting a filler out of the middle of a phrase clips the words around it, and putting a pause there makes the clipped word sound muted. The version that worked had fewer cuts, all between phrases, and ran 5 s longer.
 - Measure loudness on the stereo delivery. A mono file reads 3 dB lower and one reel shipped too loud because of it.
 - An older FFmpeg build (for example one bundled with another app) can break the silence-cutting script. Install a current FFmpeg first (`winget install Gyan.FFmpeg` on Windows) and make sure it is the one on PATH.
-- A font the renderer can't load silently falls back to another. Confirm each font actually renders on a frame before building around it, and record the approved fonts in the client's BRAND.md.
+- A font the renderer can't load silently falls back to another. HyperFrames swapped Bebas Neue for the much thinner League Gothic, and Cinzel isn't supported either; Oswald Bold is a close Bebas substitute. Check the compiler's "Injected @font-face" log line and a rendered frame before building around a font, and record the approved fonts in the client's BRAND.md.
+- A GSAP `fromTo` shows its starting state from the clip's first frame. Effects that begin later in the clip (ripples, flashes) need `immediateRender: false`, or they sit visible before their cue.
+- With FFmpeg 6, the silence-cut script's filter graph can be run with `-filter_complex_script <file>`, mapping `[v]` and `[a]`, if updating FFmpeg isn't possible.
+- Preflight flags a root `data-start="0"` when the composition has an inline video, but lint requires it. Keep it; the render validates it.
 - A raw recording caps the edit. A clip with no hook and no CTA scores low no matter how well it's cut. Script the hook before you record.
