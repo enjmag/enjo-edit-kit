@@ -12,6 +12,9 @@ incomplete; apply `../short-form-edit/references/conversion-and-client-goals.md`
 for structure, CTA, and proof. If a direction is
 missing, propose a style from `style-library/registry.json` based on the footage.
 
+Read `docs/EDITING-PLAYBOOK.md` for the house rules learned from review notes
+(jump-cut punch-ins, graphic breathing room, one type family, frame-grid timing).
+
 1. Inspect duration, streams, and source resolution with ffprobe. Copy the source
    into the project's assets or reference an explicitly provided local path.
 2. Read `docs/TOOLS-AND-API-KEYS.md` before service setup. Reuse a matching word
@@ -33,7 +36,8 @@ missing, propose a style from `style-library/registry.json` based on the footage
    adapt a card. Localize every asset used by the composition.
 7. Run preflight and HyperFrames lint from the project, plus the transcript-sync
    validator for anchored sub-compositions. Review Studio before the draft.
-8. Render a draft, inspect encoded frames and transitions, and listen across cut
+8. Render a draft, inspect encoded frames at every cut and every graphic entry
+   and exit, and transitions, and listen across cut
    boundaries. Check face framing, text legibility, black frames, and A/V sync.
    Resolve failures before the final render. Follow any review approvals already
    provided; do not repeat approval requests for the same authorized action.

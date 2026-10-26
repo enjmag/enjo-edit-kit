@@ -37,6 +37,15 @@ Real examples of notes that became rules:
 | "You cut out my natural pause after 'first', it feels too quick." Then, after a fix that added silence there: "You muted out the word first." | Speech is cut between phrases at real silence, never inside one. A filler that runs straight into the next word stays, because cutting it clips the words around it. |
 | "The caption covers my mouth in the first second." | A caption that runs across a cut moves with the cut, and the first 2.5 s are checked frame by frame for anything over the mouth. |
 
+Notes from our own client edits, added the same way:
+
+| Note | What the skill does now |
+|---|---|
+| "The font on REAL ESTATE STRATEGIST feels lost." (name title subtitle in a different font from everything else) | One type family across the name title, its subtitle, captions, and graphic titles. Vary weight, size, and letter-spacing for hierarchy, never a second unrelated font. |
+| "Add a pause after 'short hold' so viewers have time to see the graphic." | Each motion graphic gets about 1 s of breathing room after its key word before the next line, longer for comparison panels. Restore the speaker's real pause from the raw first; pad only with matching room tone, never frozen frames. |
+| "There's a glitch on some cuts, 1 frame before the motion graphic comes in." | Cut points and graphic start times sit on the same frame grid. Frame strips are checked at every graphic entry and exit, not just at cuts. |
+| "When there's a jump cut, add a bit of zoom to hide the cut." | Every jump cut on the speaker alternates framing with a hard punch-in (about 8 to 12% tighter) on the cut frame. Face stays well framed and captions stay off the mouth. Cuts covered by a full-screen graphic are skipped. |
+
 The editing knowledge lives in the skill files, so you can read it, edit it, and share it.
 
 ## The edit, step by step
@@ -130,11 +139,15 @@ Rules that came from mistakes:
 - End on the thesis line, spoken in the decay of the last music hit, then the logo.
 - Dim UI panels and waveforms lose viewers. Put real footage in those scenes.
 
+**Event thank-you / confirmation video (16:9, client):** for people who just signed up for a seminar or webinar. The goal is that they show up. Match the client's previous approved video in look and pacing so the series feels consistent. Name title for the first 4 s, captions throughout, one moving graphic per topic the speaker lists (only what they say: no added numbers, names, or claims), then an event card with day, date, time, and venue, checked against what the client confirms rather than the transcript (speech-to-text mishears venue names). Tighten pauses only; keep every word. Add music or a second CTA only when asked.
+
 ## Checking the edit
 
 The agent checks its own work before you see it:
 - **Lip sync:** match cut frames against the raw. A matching frame count alone does not prove the right frames were picked.
 - **Frame strips** across every cut (10 frames each side). They catch one-frame empty panels and captions flashing over the wrong shot that single screenshots miss.
+- **Graphic entries and exits:** a frame strip at every graphic in and out. A one-frame flash of the wrong shot before a graphic usually means its start time and the nearest cut fell on different frames.
+- **Jump cuts:** every cut on the speaker either changes framing (punch-in) or is covered by a graphic.
 - **Contrast** behind every caption.
 - **Every word whole:** transcribe the final render and compare the words at every cut with the raw recording. A transcript alone is not proof: speech-to-text guesses a clipped word correctly while a listener hears it broken.
 - **The first second:** read the first 2.5 s frame by frame and the first frame of every face shot. Nothing covers the mouth.
@@ -152,4 +165,6 @@ The agent checks its own work before you see it:
 - Animate transforms (x, y, scale), not `top` or `left`.
 - Cutting a filler out of the middle of a phrase clips the words around it, and putting a pause there makes the clipped word sound muted. The version that worked had fewer cuts, all between phrases, and ran 5 s longer.
 - Measure loudness on the stereo delivery. A mono file reads 3 dB lower and one reel shipped too loud because of it.
+- An older FFmpeg build (for example one bundled with another app) can break the silence-cutting script. Install a current FFmpeg first (`winget install Gyan.FFmpeg` on Windows) and make sure it is the one on PATH.
+- A font the renderer can't load silently falls back to another. Confirm each font actually renders on a frame before building around it, and record the approved fonts in the client's BRAND.md.
 - A raw recording caps the edit. A clip with no hook and no CTA scores low no matter how well it's cut. Script the hook before you record.
