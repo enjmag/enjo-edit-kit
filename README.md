@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/4ad48761-d14c-407a-9dec-1b76a9afb04a
 ## What's included
 
 - **[Editing playbook](docs/EDITING-PLAYBOOK.md):** how Nate's videos get edited with AI, the measured house reel style, the B-roll, caption, and sound rules, and how every note becomes a rule in a skill.
-- **15 skills**, mirrored for both assistants, with their helper scripts and references.
+- **17 skills** (15 from Nate plus `client-brief` and `performance-review`), mirrored for both assistants, with their helper scripts and references.
 - **406 draft motion-graphics cards** across two styles, with manifests, CSS tokens, and editable slots.
 - **Two scene templates:** dark graph paper and a left glass popout.
 - Transcription, silence cutting, mistake detection, reviewed cut rendering,
@@ -125,6 +125,25 @@ The skill includes planning references and validators for caption timing, source
 mapping, scene coverage, and footage reuse. It is an agent-guided workflow;
 review the actual motion and audio before publishing.
 [Short-form walkthrough and validation commands](docs/SHORT-FORM.md).
+
+## Client and conversion work
+
+This fork adds a client layer on top of Nate's kit. Each client gets a folder
+with a brief (offer, audience, objection, proof, CTA, success metric), a brand
+kit, rules learned from their notes and results, and a performance log.
+
+```sh
+npm run new-client -- acme-fitness
+npm run check:brief -- clients/acme-fitness
+```
+
+> Use client-brief to set up acme-fitness from these notes: [paste]. Then use
+> short-form-edit to turn my recording at [local path] into a paid Meta ad for
+> them, with three hook variants.
+
+When results come in, add them to `clients/<slug>/PERFORMANCE.md` and say
+"use performance-review for acme-fitness". See [clients/README.md](clients/README.md).
+Client folders are gitignored, so briefs and results stay on your computer.
 
 ## Make a motion-design showreel
 

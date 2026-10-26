@@ -13,6 +13,11 @@ renders/
 **/assets/
 tmp/
 archives/
+
+# Client briefs, brand files, and results stay local; only the template is shared.
+clients/*
+!clients/README.md
+!clients/_template/
 *.mp4
 *.mov
 *.mkv

@@ -13,6 +13,8 @@
     "setup": "node scripts/setup.mjs",
     "new-video": "node scripts/new-video.mjs",
     "demo": "node scripts/new-video.mjs demo",
+    "new-client": "node scripts/new-client.mjs",
+    "check:brief": "node scripts/check-brief.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "node scripts/check-kit.mjs",
     "catalog": "node scripts/style-library/build-registry.mjs",
