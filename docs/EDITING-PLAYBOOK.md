@@ -44,6 +44,8 @@ Notes from our own client edits, added the same way:
 | "The font on REAL ESTATE STRATEGIST feels lost." (name title subtitle in a different font from everything else) | One type family across the name title, its subtitle, captions, and graphic titles. Vary weight, size, and letter-spacing for hierarchy, never a second unrelated font. |
 | "Add a pause after 'short hold' so viewers have time to see the graphic." Then: "Not 1 second, 0.5, or as long as viewers can digest." | Each motion graphic gets a short hold after its key word before the next line: start around 0.5 s and give it only as long as a viewer needs to read it (a simple label less, a dense comparison more). Use the speaker's real pause from the raw; pad only with matching room tone, never frozen frames. |
 | "There's a glitch on some cuts, 1 frame before the motion graphic comes in." | Cut points and graphic start times sit on the same frame grid. Frame strips are checked at every graphic entry and exit, not just at cuts. |
+| "What I hate most is a two-line subtitle with one word on the second line." | Captions default to one line. A chunk that would wrap is re-split at a phrase boundary instead. Two lines only when a long or fast phrase must stay together, balanced in length, and a single word alone on a line fails the build. |
+| "Make the SFX subtle, none on the name lower third. The music is overpowering the voice." | Sound effects sit under the voice, felt more than heard, and name titles get none. The music bed is checked against the voice on the stems after the final loudness step; when a client says it's too loud, widen the voice-to-bed gap (one client landed at about 23 dB under, ducked under speech), not just the master level. |
 | "When there's a jump cut, add a bit of zoom to hide the cut." | Every jump cut on the speaker alternates framing with a hard punch-in (about 8 to 12% tighter) on the cut frame. Face stays well framed and captions stay off the mouth. Cuts covered by a full-screen graphic are skipped. |
 
 The editing knowledge lives in the skill files, so you can read it, edit it, and share it.
@@ -110,6 +112,7 @@ Rules that came from mistakes:
 - 1 to 3 words per chunk, split on phrase boundaries. They hard-swap with no pop animation and appear 2 frames before the first word.
 - Montserrat ExtraBold, all caps, about 62 to 64 px, with a heavy serif accent (Abril Fatface) on 5 to 20% of chunks for soft words. Never two serif chunks in a row.
 - Color on 25 to 45% of chunks, whole chunk only: red for the wrong way or a loss, teal for the concept or keyword, green for the action or payoff.
+- **No orphan words:** one line per chunk by default. Never leave a single word alone on a line; re-split the chunk instead.
 - **One look for the whole reel:** every caption in the same dark box with a thin light edge, so it reads on black, white, and footage alike. Mixing boxed and bare captions looked cheap.
 - **Never white on light.** Measure the pixels behind every caption.
 - Position: on the seam in a split, on the shirt in a punch-in (not the jaw), and in a clear zone when the shot is text to read.
