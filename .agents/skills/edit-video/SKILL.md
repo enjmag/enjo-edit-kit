@@ -6,7 +6,10 @@ description: Edit a raw talking-head video through transcription, silence trimmi
 # Edit a video
 
 Keep each project in `video-projects/<slug>/`, preserving the source recording.
-Read the workspace guide and the project's brief or DESIGN.md. If a direction is
+Read the workspace guide and the project's brief or DESIGN.md. For client work,
+read `clients/<slug>/` first and follow `../client-brief/SKILL.md` if the brief is
+incomplete; apply `../short-form-edit/references/conversion-and-client-goals.md`
+for structure, CTA, and proof. If a direction is
 missing, propose a style from `style-library/registry.json` based on the footage.
 
 1. Inspect duration, streams, and source resolution with ffprobe. Copy the source

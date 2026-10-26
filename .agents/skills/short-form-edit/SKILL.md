@@ -31,6 +31,18 @@ When the user gives a note on a draft, fix the edit, then offer to write the
 note into the relevant skill or reference as a rule, check, or script change, so
 the next edit starts from it. Record the note and the resulting rule together.
 
+## Client work
+
+When the edit is for a client, an offer, or an ad, read `clients/<slug>/BRIEF.md`,
+`BRAND.md`, `RULES.md`, and `PERFORMANCE.md` before anything else, and run
+`node scripts/check-brief.mjs clients/<slug>`. If the brief is incomplete, use the
+`client-brief` skill first. Then follow
+[conversion-and-client-goals.md](references/conversion-and-client-goals.md): map
+the brief into DESIGN.md, pick a story structure from the goal, make the CTA
+match the destination, use only the brief's proof, and export hook variants when
+the brief or a paid placement calls for testing. Client rules and brand override
+the house style. The first-3-seconds gate still comes first.
+
 ## Establish the edit
 
 1. Read the scoped workspace guide, `MOTION_PHILOSOPHY.md`, and the HyperFrames
@@ -333,7 +345,9 @@ inspection, file existence, or an empty validator result.
 
 ## Delivery
 
-Return a playable final MP4, its absolute path, and the skill path. Keep the
+Return a playable final MP4, its absolute path, and the skill path.
+For client work also return every hook variant, `assets/VARIANTS.json`, and the
+ready-to-paste `PERFORMANCE.md` rows. Keep the
 composition, assets, source and retimed transcripts, EDL, shot/event plan, audio
 stems, reference analysis, and QA evidence in the project. Clearly identify the
 final version. Never label a draft final or claim guaranteed viral performance.

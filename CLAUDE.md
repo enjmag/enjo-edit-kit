@@ -26,6 +26,8 @@ For one stage, load the matching local skill:
 | New motion-graphics video from a brief | `make-a-video` |
 | Website-inspired compositions | `website-to-hyperframes` |
 | Full raw-video edit | `edit-video` |
+| Set up or complete a client brief and brand kit | `client-brief` |
+| Turn published results into editing rules | `performance-review` |
 | Silence removal | `cut-silences` |
 | Retakes, false starts, or stutters | `cut-mistakes` |
 | Narrative arc, persistent world, and visual callbacks | `video-storytelling` |
@@ -55,6 +57,18 @@ obsolete work. Video projects, personal footage, transcripts, credentials, and
 renders are gitignored. The 12 already-published projects are retained as teaching examples; new private
 projects stay ignored. Do not treat existing public examples as permission to add
 new personal footage. Never print secrets or copy private media into library examples.
+
+## Client work
+
+Client briefs, brand kits, rules, and results live in `clients/<slug>/`
+(gitignored except `clients/_template/`). For any client, offer, or ad edit,
+read that folder first and run `npm run check:brief -- clients/<slug>`; use
+`client-brief` when it fails. Follow
+`.claude/skills/short-form-edit/references/conversion-and-client-goals.md`.
+The client's RULES.md and BRAND.md override Nate's house style. The brief's
+success metric defines a good edit; only real results in PERFORMANCE.md show
+whether it converts. When results come in, use `performance-review` to turn
+them into rules, the same way review notes become rules.
 
 ## Editing and timing
 
