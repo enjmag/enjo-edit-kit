@@ -70,6 +70,11 @@ success metric defines a good edit; only real results in PERFORMANCE.md show
 whether it converts. When results come in, use `performance-review` to turn
 them into rules, the same way review notes become rules.
 
+After every round of notes on a draft: fix the edit, add each note as a rule in
+the client's RULES.md (with its source), and if the note would apply to any
+client, also add it to `docs/EDITING-PLAYBOOK.md` or the relevant skill so the
+kit improves for every future edit. Never make the user give the same note twice.
+
 ## Editing and timing
 
 Before choosing a transcription, asset-generation, or voiceover service, read

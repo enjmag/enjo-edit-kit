@@ -37,6 +37,17 @@ Real examples of notes that became rules:
 | "You cut out my natural pause after 'first', it feels too quick." Then, after a fix that added silence there: "You muted out the word first." | Speech is cut between phrases at real silence, never inside one. A filler that runs straight into the next word stays, because cutting it clips the words around it. |
 | "The caption covers my mouth in the first second." | A caption that runs across a cut moves with the cut, and the first 2.5 s are checked frame by frame for anything over the mouth. |
 
+Notes from our own client edits, added the same way:
+
+| Note | What the skill does now |
+|---|---|
+| "The font on REAL ESTATE STRATEGIST feels lost." (name title subtitle in a different font from everything else) | One type family across the name title, its subtitle, captions, and graphic titles. Vary weight, size, and letter-spacing for hierarchy, never a second unrelated font. |
+| "Add a pause after 'short hold' so viewers have time to see the graphic." Then: "Not 1 second, 0.5, or as long as viewers can digest." | Each motion graphic gets a short hold after its key word before the next line: start around 0.5 s and give it only as long as a viewer needs to read it (a simple label less, a dense comparison more). Use the speaker's real pause from the raw; pad only with matching room tone, never frozen frames. |
+| "There's a glitch on some cuts, 1 frame before the motion graphic comes in." | Cut points and graphic start times sit on the same frame grid. Frame strips are checked at every graphic entry and exit, not just at cuts. |
+| "What I hate most is a two-line subtitle with one word on the second line." | Captions default to one line. A chunk that would wrap is re-split at a phrase boundary instead. Two lines only when a long or fast phrase must stay together, balanced in length, and a single word alone on a line fails the build. |
+| "Make the SFX subtle, none on the name lower third. The music is overpowering the voice." | Sound effects sit under the voice, felt more than heard, and name titles get none. The music bed is checked against the voice on the stems after the final loudness step; when a client says it's too loud, widen the voice-to-bed gap (one client landed at about 23 dB under, ducked under speech), not just the master level. |
+| "When there's a jump cut, add a bit of zoom to hide the cut." | Every jump cut on the speaker alternates framing with a hard punch-in (about 8 to 12% tighter) on the cut frame. Face stays well framed and captions stay off the mouth. Cuts covered by a full-screen graphic are skipped. |
+
 The editing knowledge lives in the skill files, so you can read it, edit it, and share it.
 
 ## The edit, step by step
@@ -101,6 +112,7 @@ Rules that came from mistakes:
 - 1 to 3 words per chunk, split on phrase boundaries. They hard-swap with no pop animation and appear 2 frames before the first word.
 - Montserrat ExtraBold, all caps, about 62 to 64 px, with a heavy serif accent (Abril Fatface) on 5 to 20% of chunks for soft words. Never two serif chunks in a row.
 - Color on 25 to 45% of chunks, whole chunk only: red for the wrong way or a loss, teal for the concept or keyword, green for the action or payoff.
+- **No orphan words:** one line per chunk by default. Never leave a single word alone on a line; re-split the chunk instead.
 - **One look for the whole reel:** every caption in the same dark box with a thin light edge, so it reads on black, white, and footage alike. Mixing boxed and bare captions looked cheap.
 - **Never white on light.** Measure the pixels behind every caption.
 - Position: on the seam in a split, on the shirt in a punch-in (not the jaw), and in a clear zone when the shot is text to read.
@@ -130,11 +142,17 @@ Rules that came from mistakes:
 - End on the thesis line, spoken in the decay of the last music hit, then the logo.
 - Dim UI panels and waveforms lose viewers. Put real footage in those scenes.
 
+**Event thank-you / confirmation video (16:9, client):** for people who just signed up for a seminar or webinar. The goal is that they show up. Match the client's previous approved video in look and pacing so the series feels consistent. Name title for the first 4 s, captions throughout, one moving graphic per topic the speaker lists (only what they say: no added numbers, names, or claims), then an event card with day, date, time, and venue, checked against what the client confirms rather than the transcript (speech-to-text mishears venue names). Tighten pauses only; keep every word. Add music or a second CTA only when asked.
+
 ## Checking the edit
 
 The agent checks its own work before you see it:
 - **Lip sync:** match cut frames against the raw. A matching frame count alone does not prove the right frames were picked.
 - **Frame strips** across every cut (10 frames each side). They catch one-frame empty panels and captions flashing over the wrong shot that single screenshots miss.
+- **Graphic entries and exits:** a frame strip at every graphic in and out. A one-frame flash of the wrong shot before a graphic usually means its start time and the nearest cut fell on different frames.
+- **Jump cuts:** every cut on the speaker either changes framing (punch-in) or is covered by a graphic.
+- **How to find the cuts on the encoded edit:** `ffmpeg -i edit.mp4 -vf "select='gt(scene,0.01)',showinfo" -f null -` lists every cut's frame time. Place graphic edges at that frame time minus half a frame, and snap any graphic edge within about 0.3 s of a cut onto the cut so the cut hides underneath.
+- **Punch-in values that worked:** about 10% tighter than the base framing (one client edit went from 1.25x to 1.38x), transform origin around 50% 30% so the eyes stay in the upper third, reset to the base scale under the next full-screen graphic.
 - **Contrast** behind every caption.
 - **Every word whole:** transcribe the final render and compare the words at every cut with the raw recording. A transcript alone is not proof: speech-to-text guesses a clipped word correctly while a listener hears it broken.
 - **The first second:** read the first 2.5 s frame by frame and the first frame of every face shot. Nothing covers the mouth.
@@ -152,6 +170,11 @@ The agent checks its own work before you see it:
 - Animate transforms (x, y, scale), not `top` or `left`.
 - Cutting a filler out of the middle of a phrase clips the words around it, and putting a pause there makes the clipped word sound muted. The version that worked had fewer cuts, all between phrases, and ran 5 s longer.
 - Measure loudness on the stereo delivery. A mono file reads 3 dB lower and one reel shipped too loud because of it.
+- An older FFmpeg build (for example one bundled with another app) can break the silence-cutting script. Install a current FFmpeg first (`winget install Gyan.FFmpeg` on Windows) and make sure it is the one on PATH.
+- A font the renderer can't load silently falls back to another. HyperFrames swapped Bebas Neue for the much thinner League Gothic, and Cinzel isn't supported either; Oswald Bold is a close Bebas substitute. Check the compiler's "Injected @font-face" log line and a rendered frame before building around a font, and record the approved fonts in the client's BRAND.md.
+- A GSAP `fromTo` shows its starting state from the clip's first frame. Effects that begin later in the clip (ripples, flashes) need `immediateRender: false`, or they sit visible before their cue.
+- With FFmpeg 6, the silence-cut script's filter graph can be run with `-filter_complex_script <file>`, mapping `[v]` and `[a]`, if updating FFmpeg isn't possible.
+- Preflight flags a root `data-start="0"` when the composition has an inline video, but lint requires it. Keep it; the render validates it.
 - A raw recording caps the edit. A clip with no hook and no CTA scores low no matter how well it's cut. Script the hook before you record.
 - **No lone words in captions.** A caption that wraps to leave one word on its own line ("than what most people would / do.") reads as a mistake. Keep each chunk to one line, split long sentences at phrase boundaries, pull a word forward rather than leave one alone, and use two balanced lines only for a long or fast phrase. `scripts/build-captions.mjs` builds the chunks and `scripts/check-captions.mjs <project>` measures every caption in the browser and fails on a wrap, an overflow or a lone word.
 - **Listen for hesitations, not just mistakes.** Listen through every sentence for hesitations and restarts before Draft 1; a clean transcript does not mean clean delivery. The mistake detector and a transcript read both missed "once, and then ... they forget about it" (two 0.45 s hanging pauses inside one phrase). Look for gaps of 0.3 s or more inside a phrase, cut them at true silence keeping every word, and alternate the framing on the new jump cuts.
