@@ -343,6 +343,10 @@ change. Give `VERIFY.md` the actual output hash, measured results, inspected
 artifacts, revisions, and unresolved limits. Do not claim passes based on code
 inspection, file existence, or an empty validator result.
 
+Then follow `../review-board/SKILL.md`: pre-check every scene against the brief,
+open the review board for the user (all variants or videos in one batch), and
+change only the scenes they flag before the final render.
+
 ## Delivery
 
 Return a playable final MP4, its absolute path, and the skill path.

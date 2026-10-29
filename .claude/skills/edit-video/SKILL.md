@@ -41,6 +41,8 @@ Read `docs/EDITING-PLAYBOOK.md` for the house rules learned from review notes
    boundaries. Check face framing, text legibility, black frames, and A/V sync.
    Resolve failures before the final render. Follow any review approvals already
    provided; do not repeat approval requests for the same authorized action.
+9. Read `../review-board/SKILL.md`. Pre-check each beat, open the review board,
+   and apply only the beats the user flags before the final render.
 
 Deliver the final MP4 path, edit decisions, retimed transcript, composition,
 and `VERIFY.md` describing what was checked and any remaining limitations.

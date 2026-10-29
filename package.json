@@ -15,6 +15,7 @@
     "demo": "node scripts/new-video.mjs demo",
     "new-client": "node scripts/new-client.mjs",
     "check:brief": "node scripts/check-brief.mjs",
+    "review": "node scripts/review-board.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "node scripts/check-kit.mjs",
     "catalog": "node scripts/style-library/build-registry.mjs",
