@@ -271,7 +271,7 @@ el.innerHTML='<div>'+(media?'<video src="'+media+'#t='+b.start+','+b.end+'" prel
 '<textarea placeholder="What should this beat be instead?">'+esc(b.note)+'</textarea><div class="saved"></div>'+
 '<div class="thumbs">'+b.drawings.concat(b.uploads).map(d=>'<a href="'+base+'media/'+d.file+'" target="_blank"><img src="'+base+'media/'+d.file+'" alt=""></a>').join('')+'</div>'+
 (b.history.length?'<details class="history"><summary>Earlier notes ('+b.history.length+')</summary>'+b.history.map(h=>'<div>Round '+h.round+': '+esc(h.status)+(h.note?' · '+esc(h.note):'')+'</div>').join('')+'</details>':'')+'</div>';
-const v=$('video',el);if(v){v.addEventListener('timeupdate',()=>{if(v.currentTime>=b.end-0.03){v.currentTime=b.start;}});v.addEventListener('play',()=>{if(v.currentTime<b.start||v.currentTime>=b.end)v.currentTime=b.start;});}
+const v=$('video',el);if(v){v.addEventListener('loadedmetadata',()=>{if(v.paused)v.currentTime=b.start+Math.min(1.5,(b.end-b.start)/2);},{once:true});v.addEventListener('timeupdate',()=>{if(v.currentTime>=b.end-0.03){v.currentTime=b.start;}});v.addEventListener('play',()=>{if(v.currentTime<b.start||v.currentTime>=b.end)v.currentTime=b.start;});}
 $('.jump',el).onclick=()=>{const m=$('#main');if(m){m.currentTime=b.start;m.play();}};
 const ta=$('textarea',el);let t;ta.oninput=()=>{clearTimeout(t);$('.saved',el).textContent='…';t=setTimeout(()=>update(b,{note:ta.value}),600);};
 $('.approve',el).onclick=()=>update(b,{status:b.status==='approved'?'waiting':'approved',note:ta.value},true);
