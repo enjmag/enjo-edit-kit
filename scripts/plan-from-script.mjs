@@ -40,12 +40,13 @@ function findSeq(hay, needle, from) {
 
 /**
  * Find each beat's start in the spoken words, in order. A beat whose full anchor
- * is missing is matched on its first three words, then its first two.
+ * is missing is matched on its first three words, then its first two. The first
+ * beat falls back to the first spoken word.
  */
 export function locateBeats(beats, words) {
   const norms = words.map((w) => w.norm);
   let cursor = 0;
-  return beats.map((beat) => {
+  return beats.map((beat, k) => {
     const anchor = normalizeWords(beat.anchor);
     for (const len of [anchor.length, 3, 2]) {
       if (len > anchor.length || len < 1) continue;
@@ -55,6 +56,8 @@ export function locateBeats(beats, words) {
         return { ...beat, wordIndex: at, start: words[at].start, matched: len === anchor.length ? 'exact' : `first ${len} words` };
       }
     }
+    // The first beat always opens the video, even when its opening words were changed.
+    if (k === 0) return { ...beat, wordIndex: 0, start: words[0].start, matched: 'opening words differ; placed at the start' };
     return { ...beat, wordIndex: -1, start: null, matched: 'not found' };
   });
 }

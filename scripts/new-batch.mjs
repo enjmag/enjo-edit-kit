@@ -9,6 +9,7 @@
 // Usage (from the kit root):
 //   node scripts/new-batch.mjs <batch.json>            create every project that is missing
 //   node scripts/new-batch.mjs <batch.json> --dry-run  show what would be created
+//   --kit <dir>  create the projects in another copy of the kit (default: this one)
 //
 // batch.json:
 // {
@@ -26,7 +27,8 @@ import { resolve, join, dirname, basename } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+let root = defaultRoot;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Check a batch manifest and return a list of problems (empty when valid). */
@@ -109,7 +111,9 @@ export function plannedVariants(batch) {
 
 function main() {
   const args = process.argv.slice(2);
-  const file = args.find((a) => !a.startsWith('--'));
+  const kitAt = args.indexOf('--kit');
+  if (kitAt > -1) root = resolve(args[kitAt + 1]);
+  const file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--kit');
   const dry = args.includes('--dry-run');
   if (!file) {
     console.log('Usage: node scripts/new-batch.mjs <batch.json> [--dry-run]');
