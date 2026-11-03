@@ -43,6 +43,11 @@ match the destination, use only the brief's proof, and export hook variants when
 the brief or a paid placement calls for testing. Client rules and brand override
 the house style. The first-3-seconds gate still comes first.
 
+For a batch where every ad is one of several hooks followed by one shared body,
+follow `docs/BULK-EDITING.md`: plan the beats from the script before the footage
+arrives, edit the body once, time each project's beats with
+`npm run plan:script`, and join hook and body with `npm run stitch`.
+
 ## Establish the edit
 
 1. Read the scoped workspace guide, `MOTION_PHILOSOPHY.md`, and the HyperFrames
