@@ -41,11 +41,12 @@ https://github.com/user-attachments/assets/4ad48761-d14c-407a-9dec-1b76a9afb04a
 ## What's included
 
 - **[Editing playbook](docs/EDITING-PLAYBOOK.md):** how Nate's videos get edited with AI, the measured house reel style, the B-roll, caption, and sound rules, and how every note becomes a rule in a skill.
-- **17 skills** (15 from Nate plus `client-brief` and `performance-review`), mirrored for both assistants, with their helper scripts and references.
+- **18 skills** (15 from Nate plus `client-brief`, `performance-review`, and `review-board`), mirrored for both assistants, with their helper scripts and references.
 - **406 draft motion-graphics cards** across two styles, with manifests, CSS tokens, and editable slots.
 - **Two scene templates:** dark graph paper and a left glass popout.
 - Transcription, silence cutting, mistake detection, reviewed cut rendering,
   transcript retiming, EDL review, beat-sync validation, and preflight tools.
+- **Review board:** a beat-by-beat page for each draft (or a whole batch) where you approve or flag each beat, write or draw your change, and Claude fixes only what you flagged.
 - **Short-form editing:** reels, YouTube Shorts, hook and payoff planning, precise captions, moving B-roll, and audio review.
 - **12 existing teaching projects** preserved from the original kit.
 - A synthetic starter composition and editing fixture that need no footage or API key.
@@ -144,6 +145,23 @@ npm run check:brief -- clients/acme-fitness
 When results come in, add them to `clients/<slug>/PERFORMANCE.md` and say
 "use performance-review for acme-fitness". See [clients/README.md](clients/README.md).
 Client folders are gitignored, so briefs and results stay on your computer.
+
+## Review drafts beat by beat
+
+After a draft render, Claude pre-checks every beat against the brief and opens a
+review board in your browser. Each beat has its clip, what is said, what is on
+screen, and Approve, Change, Draw, Upload reference, and New idea buttons. Your
+notes save into the project's `review/` folder.
+
+```sh
+npm run review -- video-projects/my-video
+npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch
+npm run review -- --all                                     # every project with a render
+```
+
+When you're done, tell Claude "I left review notes on my-video, let's amend."
+It changes only the flagged beats, sends them back for another look, and adds
+each note to the client's rules so you never give it twice.
 
 ## Make a motion-design showreel
 

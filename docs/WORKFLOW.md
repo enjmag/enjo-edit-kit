@@ -64,4 +64,17 @@ Run beat-sync only for anchored external sub-compositions; it fails when none
 are present. For inline compositions, check timing manually. Review Studio, then
 render a draft. Inspect encoded frames at hero moments and transitions, and
 listen at joins. Fix problems and write VERIFY.md before a standard render.
+
+## 6. Review beat by beat
+
+Claude writes `review/precheck.json` with its flags for each beat, then opens the
+board. Approve or flag every beat, write or draw the change, and say "I left review
+notes, let's amend." Claude changes only flagged beats and marks them revised.
+
+```sh
+npm run review -- video-projects/my-video
+npm run review -- video-projects/my-video --notes
+npm run review -- video-projects/my-video --mark-revised b02,b05
+```
+
 Publication is a separate action requiring the student's instruction.
