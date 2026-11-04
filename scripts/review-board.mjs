@@ -132,12 +132,12 @@ export function mergeReview(saved, beats, meta = {}) {
 }
 
 /** Timeline mode: add a comment pinned to a timestamp. */
-export function addComment(review, { time, text = '', drawing = null }, now = new Date().toISOString()) {
+export function addComment(review, { time, text = '', drawing = null, attachments = [] }, now = new Date().toISOString()) {
   const t = Number(time);
   if (!Number.isFinite(t) || t < 0) throw new Error('Bad time');
-  if (!String(text).trim() && !drawing) throw new Error('Write a comment or draw something first');
+  if (!String(text).trim() && !drawing && !attachments.length) throw new Error('Write a comment, draw, or attach something first');
   const n = review.comments.reduce((m, c) => Math.max(m, Number(c.id.slice(1)) || 0), 0) + 1;
-  const c = { id: `c${String(n).padStart(2, '0')}`, time: round2(t), text: String(text).slice(0, 4000), drawing, done: false, round: review.round, at: now };
+  const c = { id: `c${String(n).padStart(2, '0')}`, time: round2(t), text: String(text).slice(0, 4000), drawing, attachments, done: false, round: review.round, at: now };
   review.comments.push(c);
   review.comments.sort((a, b) => a.time - b.time);
   review.updatedAt = now;
@@ -210,6 +210,7 @@ export function notesText(review) {
     for (const c of open) {
       lines.push(`- ${c.id} at ${fmtTime(c.time)} (${c.time}s): ${c.text || '(drawing only)'}`);
       if (c.drawing) lines.push(`    drawing: ${c.drawing}`);
+      for (const a of c.attachments ?? []) lines.push(`    attachment: ${a.file}${a.name ? ` (${a.name})` : ''}`);
     }
     if (!open.length) lines.push('- No open comments.');
     return lines.join('\n');
@@ -406,7 +407,8 @@ aside h2{font-size:14px;margin:0 0 8px;color:var(--dim);text-transform:uppercase
 .c.done{border-left-color:var(--ok);opacity:.65}.c.now{outline:2px solid var(--blue)}
 .c .t{font-weight:700;color:var(--acc);cursor:pointer;font-variant-numeric:tabular-nums}.c.done .t{color:var(--ok)}
 .c p{margin:6px 0;white-space:pre-wrap}.c img{max-width:100%;border-radius:6px;border:1px solid var(--line);margin-top:4px}
-.c .row button{padding:3px 10px;font-size:13px}
+.c .row button{padding:3px 10px;font-size:13px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{background:#232934;border:1px solid var(--line);border-radius:14px;padding:2px 10px;font-size:13px}.chip b{cursor:pointer;margin-left:6px;color:var(--dim)}
+.att{display:block;margin-top:4px;color:#9fb4ff;font-size:13px}.c video{max-width:100%;border-radius:6px;margin-top:4px}
 @media(max-width:900px){main{grid-template-columns:1fr}}
 </style></head><body>
 <header><h1>Review: ${esc(p.review.project)}</h1><span class="counts" id="counts"></span><span style="flex:1"></span>
@@ -417,7 +419,8 @@ ${finishButtons(p.review)}${base !== '/' ? '<a href="/" style="color:var(--dim)"
 <div class="track" id="track"><div class="played" id="played"></div></div>
 <div class="composer"><div class="row"><span>Comment at <span class="at" id="at">0:00.0</span></span><span class="dim">The video pauses while you type or draw.</span></div>
 <textarea id="text" placeholder="What should change here? (Ctrl+Enter to post)"></textarea>
-<div class="row"><button class="primary" id="post">Post comment</button><button id="drawBtn">✎ Draw on frame</button><span class="dim" id="msg"></span></div></div>
+<div class="row"><button class="primary" id="post">Post comment</button><button id="attachBtn">📎 Attach</button><button id="drawBtn">✎ Draw on frame</button><span class="dim" id="msg"></span></div>
+<div class="chips" id="chips"></div></div>
 <p class="dim">Pause anywhere, write what to change, and post. Click a comment to jump back to it. When you're done, press <b>Send notes for amend</b> and Claude starts fixing them on this PC, or <b>Approve video</b> if nothing needs to change.</p>
 </section>
 <aside><h2>Comments</h2><div id="list"></div></aside></main>
@@ -433,7 +436,7 @@ function render(){const open=R.comments.filter(c=>!c.done).length;$('#counts').i
 const d=v&&v.duration||0;$('#track').querySelectorAll('.pin').forEach(e=>e.remove());
 if(d)R.comments.forEach(c=>{const e=document.createElement('div');e.className='pin'+(c.done?' done':'');e.style.left=(c.time/d*100)+'%';e.title=fmt(c.time)+' '+c.text;e.onclick=ev=>{ev.stopPropagation();seek(c.time);};$('#track').appendChild(e);});
 $('#list').innerHTML=R.comments.length?R.comments.map(c=>'<div class="c'+(c.done?' done':'')+'" id="'+c.id+'"><div class="row"><span class="t" data-t="'+c.time+'">'+fmt(c.time)+'</span><span class="dim">'+c.id+(c.round>1?' · round '+c.round:'')+'</span></div>'+
-(c.text?'<p>'+esc(c.text)+'</p>':'')+(c.drawing?'<a href="'+base+'media/'+c.drawing+'" target="_blank"><img src="'+base+'media/'+c.drawing+'" alt="drawing"></a>':'')+
+(c.text?'<p>'+esc(c.text)+'</p>':'')+(c.attachments||[]).map(a=>{const u=base+'media/'+a.file;return /\\.(png|jpe?g|gif|webp)$/i.test(a.file)?'<a href="'+u+'" target="_blank"><img src="'+u+'" alt=""></a>':/\\.(mp4|webm|mov)$/i.test(a.file)?'<video src="'+u+'" controls preload="metadata"></video>':'<a class="att" href="'+u+'" target="_blank">📎 '+esc(a.name||a.file)+'</a>';}).join('')+(c.drawing?'<a href="'+base+'media/'+c.drawing+'" target="_blank"><img src="'+base+'media/'+c.drawing+'" alt="drawing"></a>':'')+
 '<div class="row"><button data-done="'+c.id+'">'+(c.done?'Reopen':'Resolve')+'</button><button data-edit="'+c.id+'">Edit</button><button data-del="'+c.id+'">Delete</button></div></div>').join(''):'<p class="dim">No comments yet. Pause the video where something should change and write it below the player.</p>';}
 function seek(t){if(!v)return;v.currentTime=t;v.pause();setAt();}
 $('#list').onclick=async e=>{const t=e.target;try{
@@ -460,8 +463,15 @@ ov.onpointerdown=e=>{cur={c:$('#pen').value,p:[pos(e)]};strokes.push(cur);ov.set
 ov.onpointermove=e=>{if(cur){cur.p.push(pos(e));redraw();}};ov.onpointerup=()=>{cur=null;};addEventListener('resize',redraw);}
 $('#undo').onclick=()=>{strokes.pop();redraw();};$('#clear').onclick=()=>{strokes=[];redraw();};
 function snapshot(){const w=v.videoWidth||1920,h=v.videoHeight||1080,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,w,h);try{g.drawImage(v,0,0,w,h);}catch(e){}paint(g,{x:0,y:0,w:w,h:h},Math.max(4,w/150));return c.toDataURL('image/png');}
-$('#post').onclick=async()=>{const text=$('#text').value.trim();const drew=strokes.length>0;if(!text&&!drew){$('#msg').textContent='Write something or draw first.';return;}
-try{await post('comment',{time:pinTime,text,dataUrl:drew?snapshot():undefined});$('#text').value='';stopDraw(true);$('#msg').textContent='Posted at '+fmt(pinTime);}catch(e){alert('Could not save: '+e.message);}};
+let files=[];const readUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f);});
+function chips(){$('#chips').innerHTML=files.map((f,i)=>'<span class="chip">📎 '+esc(f.name)+'<b data-rm="'+i+'">×</b></span>').join('');}
+$('#chips').onclick=e=>{if(e.target.dataset.rm!==undefined){files.splice(Number(e.target.dataset.rm),1);chips();}};
+$('#attachBtn').onclick=()=>{if(v){v.pause();if(!$('#text').value)setAt();}const i=document.createElement('input');i.type='file';i.multiple=true;i.accept='image/*,video/*,audio/*,.pdf,.txt';
+i.onchange=()=>{for(const f of i.files){if(f.size>80*1024*1024){alert(f.name+' is over 80 MB.');continue;}files.push(f);}chips();};i.click();};
+$('#post').onclick=async()=>{const text=$('#text').value.trim();const drew=strokes.length>0;if(!text&&!drew&&!files.length){$('#msg').textContent='Write something, attach a file, or draw first.';return;}
+$('#post').disabled=true;$('#msg').textContent=files.length?'Uploading…':'';
+try{const attachments=[];for(const f of files)attachments.push({name:f.name,dataUrl:await readUrl(f)});
+await post('comment',{time:pinTime,text,dataUrl:drew?snapshot():undefined,attachments});$('#text').value='';files=[];chips();stopDraw(true);$('#msg').textContent='Posted at '+fmt(pinTime);}catch(e){alert('Could not save: '+e.message);}$('#post').disabled=false;};
 ${FINISH_JS}
 render();
 </script></body></html>`;
@@ -481,7 +491,7 @@ function indexHtml(projects) {
 
 // ---------- server ----------
 
-const TYPES = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.json': 'application/json' };
+const TYPES = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.json': 'application/json', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8' };
 
 function sendFile(req, res, file) {
   const size = statSync(file).size;
@@ -505,6 +515,21 @@ function readBody(req, limit = 30 * 1024 * 1024) {
     req.on('data', (c) => { n += c.length; if (n > limit) { fail(new Error('Too large')); req.destroy(); } else chunks.push(c); });
     req.on('end', () => { try { ok(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch (e) { fail(e); } });
   });
+}
+
+const ATTACH = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'application/pdf': 'pdf', 'text/plain': 'txt' };
+
+/** Save a file attached to a timeline comment into review/attachments. */
+function saveAttachment(p, stemId, dataUrl, name = '') {
+  const m = String(dataUrl).match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
+  const ext = m && ATTACH[m[1]];
+  if (!ext) throw new Error('Attach an image, video, audio, PDF or text file');
+  const dir = join(p.reviewDir, 'attachments');
+  mkdirSync(dir, { recursive: true });
+  const safe = basename(name, extname(name)).replace(/[^a-z0-9-]+/gi, '-').slice(0, 40);
+  const file = join(dir, `${stemId}-r${p.review.round}-${Date.now()}${safe ? '-' + safe : ''}.${ext}`);
+  writeFileSync(file, Buffer.from(m[2], 'base64'));
+  return relative(p.dir, file).split(sep).join('/');
 }
 
 function saveImage(p, beatId, kind, dataUrl, name = '') {
@@ -567,10 +592,13 @@ export function startServer(projects, port = 4848) {
       }
       if (req.method === 'POST' && ['comment', 'comment-update', 'comment-delete'].includes(rest)) {
         if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
-        const body = await readBody(req);
+        const body = await readBody(req, rest === 'comment' ? 120 * 1024 * 1024 : undefined);
         if (rest === 'comment') {
+          const stem = `t${Math.round(Number(body.time) * 10)}`;
+          const attachments = (Array.isArray(body.attachments) ? body.attachments : []).slice(0, 10)
+            .map((a) => ({ file: saveAttachment(p, stem, a.dataUrl, a.name), name: String(a.name ?? '').slice(0, 120) }));
           const drawing = body.dataUrl ? saveImage(p, `t${Math.round(Number(body.time) * 10)}`, 'drawings', body.dataUrl) : null;
-          addComment(p.review, { time: body.time, text: body.text, drawing });
+          addComment(p.review, { time: body.time, text: body.text, drawing, attachments });
         } else if (rest === 'comment-update') updateComment(p.review, body.id, body.patch ?? {});
         else deleteComment(p.review, body.id);
         save(p);
