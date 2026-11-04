@@ -483,7 +483,7 @@ function snapshot(){const w=v.videoWidth||1920,h=v.videoHeight||1080,c=document.
 let files=[];const readUrl=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f);});
 function chips(){$('#chips').innerHTML=files.map((f,i)=>'<span class="chip">📎 '+esc(f.name)+'<b data-rm="'+i+'">×</b></span>').join('');}
 $('#chips').onclick=e=>{if(e.target.dataset.rm!==undefined){files.splice(Number(e.target.dataset.rm),1);chips();}};
-$('#attachBtn').onclick=()=>{if(v){v.pause();if(!$('#text').value)setAt();}const i=document.createElement('input');i.type='file';i.multiple=true;i.accept='image/*,video/*,audio/*,.pdf,.txt';
+$('#attachBtn').onclick=()=>{if(v){v.pause();if(!$('#text').value)setAt();}const i=document.createElement('input');i.type='file';i.multiple=true;i.accept='image/*,video/*,audio/*,.pdf,.txt,.md,.ppt,.pptx,.key,.doc,.docx,.xls,.xlsx,.csv,.zip,.psd,.ai,.aep,.prproj,.srt,.json';
 i.onchange=()=>{for(const f of i.files){if(f.size>80*1024*1024){alert(f.name+' is over 80 MB.');continue;}files.push(f);}chips();};i.click();};
 $('#post').onclick=async()=>{const text=$('#text').value.trim();const drew=strokes.length>0;if(!text&&!drew&&!files.length){$('#msg').textContent='Write something, attach a file, or draw first.';return;}
 $('#post').disabled=true;$('#msg').textContent=files.length?'Uploading…':'';
@@ -508,7 +508,9 @@ function indexHtml(projects) {
 
 // ---------- server ----------
 
-const TYPES = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.json': 'application/json', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8' };
+const TYPES = { '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.json': 'application/json',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.csv': 'text/csv', '.zip': 'application/zip', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf', '.txt': 'text/plain; charset=utf-8' };
 
 function sendFile(req, res, file) {
   const size = statSync(file).size;
@@ -534,13 +536,17 @@ function readBody(req, limit = 30 * 1024 * 1024) {
   });
 }
 
+const ATTACH_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'mp4', 'mov', 'webm', 'mp3', 'wav', 'm4a', 'pdf', 'txt', 'md',
+  'ppt', 'pptx', 'key', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip', 'psd', 'ai', 'aep', 'prproj', 'srt', 'json']);
 const ATTACH = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'application/pdf': 'pdf', 'text/plain': 'txt' };
 
 /** Save a file attached to a timeline comment into review/attachments. */
 function saveAttachment(p, stemId, dataUrl, name = '') {
-  const m = String(dataUrl).match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
-  const ext = m && ATTACH[m[1]];
-  if (!ext) throw new Error('Attach an image, video, audio, PDF or text file');
+  const m = String(dataUrl).match(/^data:([\w.+-]*\/?[\w.+-]*);base64,(.*)$/);
+  // Trust the file name's extension when it is on the list (browsers often send no type for Office files).
+  const byName = extname(name).slice(1).toLowerCase();
+  const ext = m && (ATTACH_EXT.has(byName) ? byName : ATTACH[m[1]]);
+  if (!ext) throw new Error(`Can't attach ${name || 'this file'}. Allowed: images, video, audio, PDF, PowerPoint, Word, Excel, CSV, text and zip files.`);
   const dir = join(p.reviewDir, 'attachments');
   mkdirSync(dir, { recursive: true });
   const safe = basename(name, extname(name)).replace(/[^a-z0-9-]+/gi, '-').slice(0, 40);
