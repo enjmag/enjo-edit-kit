@@ -164,8 +164,12 @@ npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch (beat card
 npm run review -- --all                                     # every project with a render
 ```
 
-When you're done, press **Send notes for amend** on the board. A Claude Code
-window opens in the kit folder and starts the amend by itself. If the project
+When you're done, press **Send notes for amend** on the board. Claude Code runs
+in the background (no terminal), shows its steps on the board, and loads the
+new draft when it's done. It may edit files and run the kit's tools (node,
+python, ffmpeg, npm run). A project's `amend.json` can add folders
+(`addDirs`) or tools (`allowedTools`). Claude Code must be signed in on the
+PC once (`claude`, then `/login`). If the project
 has an `AMEND.md`, Claude follows it to rebuild that video. Press **Approve video**
 if nothing needs to change. To turn the button off, set `REVIEW_AMEND=off` and
 tell Claude "I left review notes on my-video, let's amend" instead.

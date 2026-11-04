@@ -369,14 +369,31 @@ render();
 /** Header buttons shared by both views: finish the review without going back to Claude. */
 function finishButtons(review) {
   const a = review.amend;
-  const label = a?.state === 'sent' ? `Sent for amend ${new Date(a.at).toLocaleTimeString()}` : a?.state === 'approved' ? 'Approved' : '';
-  return `<span class="dim" id="finishState">${esc(label)}</span><button id="approveAll">✓ Approve video</button><button class="primary" id="sendAmend">Send notes for amend</button>`;
+  const label = a?.state === 'approved' ? 'Approved' : a?.state === 'amended' ? 'Amended, new draft loaded' : '';
+  return `<span class="dim" id="finishState">${esc(label)}</span><button id="approveAll">✓ Approve video</button><button class="primary" id="sendAmend">Send notes for amend</button>
+<div id="amendPanel" style="display:none;position:fixed;right:16px;bottom:16px;width:min(440px,92vw);max-height:60vh;overflow:auto;z-index:20;background:#181c23;border:1px solid #2a303a;border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px #0008">
+<div style="display:flex;gap:8px;align-items:center"><b id="amendTitle">Claude is amending…</b><span style="flex:1"></span><button id="amendStop">Stop</button><button id="amendHide">Hide</button></div>
+<ol id="amendSteps" style="margin:8px 0 0;padding-left:20px;color:#93a0b0;font-size:13px"></ol><p id="amendResult" style="white-space:pre-wrap;margin:8px 0 0"></p>
+<button id="amendReload" class="primary" style="display:none;margin-top:8px">Load the new draft</button></div>`;
 }
 const FINISH_JS = `
-async function finish(kind){const msg=kind==='amend'?'Send your notes to Claude now? A Claude window opens on this PC and starts the amend.':'Approve this video with no changes?';if(!confirm(msg))return;
+const AP=document.getElementById('amendPanel');let apTimer=null;
+function showAmend(j){if(!j||j.state==='idle')return;AP.style.display='block';
+const T={running:'Claude is amending your notes…',done:'Amend finished',failed:'Amend stopped with a problem',stopped:'Amend stopped'};
+document.getElementById('amendTitle').textContent=T[j.state]||j.state;document.getElementById('amendStop').style.display=j.state==='running'?'':'none';
+document.getElementById('amendSteps').innerHTML=(j.steps||[]).slice(-12).map(s=>'<li>'+String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</li>').join('');
+document.getElementById('amendResult').textContent=j.state==='running'?'':(j.result||'');
+document.getElementById('amendReload').style.display=j.state==='done'?'':'none';
+if(j.state==='running'){clearTimeout(apTimer);apTimer=setTimeout(pollAmend,3000);}}
+async function pollAmend(){try{showAmend(await (await fetch(base+'amend-status',{cache:'no-store'})).json());}catch(e){apTimer=setTimeout(pollAmend,5000);}}
+async function finish(kind){const msg=kind==='amend'?'Send your notes to Claude now? It fixes them in the background and the new draft loads here when it is done.':'Approve this video with no changes?';if(!confirm(msg))return;
 try{const r=await fetch(base+'finish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind})});const j=await r.json();if(!r.ok)throw new Error(j.error||'failed');
-document.getElementById('finishState').textContent=j.message;}catch(e){alert('Could not send: '+e.message);}}
-document.getElementById('sendAmend').onclick=()=>finish('amend');document.getElementById('approveAll').onclick=()=>finish('approve');`;
+document.getElementById('finishState').textContent=j.message;if(kind==='amend')pollAmend();}catch(e){alert('Could not send: '+e.message);}}
+document.getElementById('sendAmend').onclick=()=>finish('amend');document.getElementById('approveAll').onclick=()=>finish('approve');
+document.getElementById('amendHide').onclick=()=>{AP.style.display='none';};
+document.getElementById('amendStop').onclick=async()=>{if(confirm('Stop the amend?')){await fetch(base+'amend-stop',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});pollAmend();}};
+document.getElementById('amendReload').onclick=()=>location.reload();
+pollAmend();`;
 
 /** Timeline view: one player, comments pinned to timestamps, drawing right on the frame (like Frame.io). */
 export function timelineHtml(p, base) {
@@ -570,6 +587,17 @@ export function startServer(projects, port = 4848) {
         if (!inside || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end('Not found'); }
         return sendFile(req, res, file);
       }
+      if (req.method === 'GET' && rest === 'amend-status') {
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+        return res.end(JSON.stringify(amendStatus(p)));
+      }
+      if (req.method === 'POST' && rest === 'amend-stop') {
+        if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
+        const j = amendJobs.get(p.dir);
+        if (j?.child) { j.state = 'stopped'; j.result = 'Stopped. Your notes are still saved.'; j.child.kill(); }
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify(amendStatus(p)));
+      }
       if (req.method === 'POST' && rest === 'finish') {
         if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
         const body = await readBody(req);
@@ -581,9 +609,13 @@ export function startServer(projects, port = 4848) {
         } else {
           const open = (p.review.comments ?? []).filter((c) => !c.done).length + p.review.beats.filter((b) => b.status === 'change').length;
           if (!open) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'There are no open notes to amend.' })); }
-          const r = launchAmend(p, process.cwd());
-          p.review.amend = { state: 'sent', at, launched: r.launched };
-          message = r.launched ? `Sent ${open} notes. A Claude window is opening on this PC.` : `Saved, but Claude could not be opened (${r.why}). Tell Claude: I left review notes on ${p.review.project}, let's amend.`;
+          if (process.env.REVIEW_AMEND === 'off') {
+            message = `Saved. Tell Claude: I left review notes on ${p.review.project}, let's amend.`;
+          } else {
+            runAmend(p, process.cwd());
+            p.review.amend = { state: 'sent', at };
+            message = `Sent ${open} notes. Claude is working on them.`;
+          }
         }
         p.review.updatedAt = at;
         save(p);
@@ -643,26 +675,102 @@ export function amendPrompt(p, kitRoot) {
     `and add any lasting lesson to the client rules.`;
 }
 
-/** Opens a visible Claude Code window in the kit folder with the amend prompt (Windows, macOS, Linux). */
-function launchAmend(p, kitRoot) {
-  if (process.env.REVIEW_AMEND === 'off') return { launched: false, why: 'REVIEW_AMEND=off' };
-  const prompt = amendPrompt(p, kitRoot).replace(/["%^&|<>`$\\]/g, ' ');
-  try {
-    if (process.platform === 'win32') {
-      const cmdFile = join(p.reviewDir, 'amend.cmd');
-      writeFileSync(cmdFile, `@echo off\r\ntitle Claude amend - ${p.review.project}\r\ncd /d "${kitRoot}"\r\nclaude "${prompt}"\r\n`);
-      spawn('cmd', ['/c', 'start', '""', `"${cmdFile}"`], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).on('error', () => {}).unref();
-    } else if (process.platform === 'darwin') {
-      const sh = join(p.reviewDir, 'amend.command');
-      writeFileSync(sh, `#!/bin/sh\ncd "${kitRoot}"\nclaude "${prompt}"\n`, { mode: 0o755 });
-      spawn('open', [sh], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
-    } else {
-      spawn('x-terminal-emulator', ['-e', 'sh', '-c', `cd "${kitRoot}" && claude "${prompt}"`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
-    }
-    return { launched: true };
-  } catch (e) {
-    return { launched: false, why: e.message };
+/** Tools the background amend may use without asking. A project can add more in <project>/amend.json. */
+const AMEND_TOOLS = ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash(npm run review:*)', 'Bash(npm run:*)', 'Bash(node:*)', 'Bash(npx hyperframes:*)',
+  'Bash(python:*)', 'Bash(ffmpeg:*)', 'Bash(ffprobe:*)', 'Bash(cp:*)', 'Bash(mkdir:*)', 'Bash(ls:*)'];
+
+/** Finds the Claude Code binary so it can run without a shell. */
+function claudeBin() {
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  if (process.platform === 'win32') {
+    const r = spawnSync('where', ['claude.cmd'], { encoding: 'utf8' });
+    const cmd = r.stdout?.split(/\r?\n/).find(Boolean);
+    const exe = cmd && join(cmd, '..', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+    if (exe && existsSync(exe)) return exe;
   }
+  return 'claude';
+}
+
+/** One background amend per project: Claude runs headless, the board shows its progress. */
+const amendJobs = new Map();
+
+export function amendSummary(event) {
+  if (event?.type === 'assistant') {
+    const out = [];
+    for (const c of event.message?.content ?? []) {
+      if (c.type === 'text' && c.text?.trim()) out.push(c.text.trim().split('\n')[0].slice(0, 200));
+      if (c.type === 'tool_use') {
+        const i = c.input ?? {};
+        const what = i.description || i.command || i.file_path || i.pattern || '';
+        out.push(`${c.name}${what ? ': ' + String(what).replace(/\s+/g, ' ').slice(0, 140) : ''}`);
+      }
+    }
+    return out;
+  }
+  return [];
+}
+
+function runAmend(p, kitRoot) {
+  const job = amendJobs.get(p.dir);
+  if (job?.state === 'running') return job;
+  const cfg = readJson(join(p.dir, 'amend.json')) ?? {};
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits',
+    '--allowedTools', ...AMEND_TOOLS, ...(cfg.allowedTools ?? [])];
+  for (const d of cfg.addDirs ?? []) args.push('--add-dir', d);
+  // Started from inside another Claude session, the child must not inherit that session's identity.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(CLAUDE|ANTHROPIC_(BASE_URL|AUTH))/.test(k) && k !== 'CLAUDECODE'));
+  mkdirSync(p.reviewDir, { recursive: true });
+  const logFile = join(p.reviewDir, 'amend.log');
+  writeFileSync(logFile, '');
+  const next = { state: 'running', startedAt: new Date().toISOString(), steps: [], result: '' };
+  amendJobs.set(p.dir, next);
+  let child;
+  try {
+    child = spawn(claudeBin(), args, { cwd: kitRoot, env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  } catch (e) {
+    Object.assign(next, { state: 'failed', result: `Could not start Claude: ${e.message}` });
+    return next;
+  }
+  next.child = child;
+  child.stdin.end(amendPrompt(p, kitRoot));
+  let buf = '';
+  child.stdout.on('data', (d) => {
+    writeFileSync(logFile, d, { flag: 'a' });
+    buf += d.toString('utf8');
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+      let ev; try { ev = JSON.parse(line); } catch { continue; }
+      next.steps.push(...amendSummary(ev));
+      if (next.steps.length > 60) next.steps.splice(0, next.steps.length - 60);
+      if (ev.type === 'result') { next.result = String(ev.result ?? ''); next.isError = Boolean(ev.is_error); }
+    }
+  });
+  child.stderr.on('data', (d) => writeFileSync(logFile, d, { flag: 'a' }));
+  child.on('error', (e) => Object.assign(next, { state: 'failed', result: `Could not start Claude: ${e.message}` }));
+  child.on('close', (code) => {
+    delete next.child;
+    next.endedAt = new Date().toISOString();
+    if (next.state === 'stopped') return;
+    const auth = /authenticat|log ?in|OAuth/i.test(next.result);
+    next.state = code === 0 && !next.isError ? 'done' : 'failed';
+    if (auth) next.result = 'Claude Code needs you to sign in once on this PC: open a terminal, run "claude", type /login, then press Send again.';
+    // Pick up the new draft and the updated review state Claude wrote.
+    try {
+      const fresh = loadProject(p.dir, { mode: p.mode });
+      Object.assign(p, { video: fresh.video, review: fresh.review, source: fresh.source });
+    } catch {}
+    p.review.amend = { state: next.state === 'done' ? 'amended' : 'failed', at: next.endedAt };
+    save(p);
+  });
+  return next;
+}
+
+function amendStatus(p) {
+  const j = amendJobs.get(p.dir);
+  if (!j) return { state: 'idle' };
+  const { child, ...rest } = j;
+  return { ...rest, video: p.review.video, round: p.review.round };
 }
 
 function openBrowser(url) {
