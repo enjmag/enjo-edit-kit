@@ -48,3 +48,24 @@ test('decisions survive a rebuild and only flagged beats are sent back', () => {
   assert.equal(review.beats[1].history[0].note, 'Make the number yellow');
   assert.throws(() => markRevised(review, ['b09']), /Unknown beats: b09/);
 });
+
+test('timeline comments: pinned to a time, sorted, kept on rebuild, resolved by --mark-revised', async () => {
+  const { addComment, updateComment, deleteComment, fmtTime } = await import('../scripts/review-board.mjs');
+  let review = mergeReview(null, [], { project: 'one-video' });
+  addComment(review, { time: 83.44, text: 'Logo too small' });
+  addComment(review, { time: 12, text: 'Cut this pause' });
+  assert.throws(() => addComment(review, { time: 5, text: '  ' }));
+  assert.deepEqual(review.comments.map((c) => [c.id, c.time]), [['c02', 12], ['c01', 83.44]]);
+  assert.equal(fmtTime(83.44), '1:23.4');
+  assert.match(notesText(review), /c02 at 0:12\.0 \(12s\): Cut this pause/);
+
+  review = mergeReview(JSON.parse(JSON.stringify(review)), [], {});
+  assert.equal(review.comments.length, 2);
+  updateComment(review, 'c01', { text: 'Logo bigger' });
+  markRevised(review, ['c02']);
+  assert.equal(review.comments.find((c) => c.id === 'c02').done, true);
+  assert.match(notesText(review), /1 open comments, 1 resolved/);
+  deleteComment(review, 'c01');
+  assert.match(notesText(review), /No open comments/);
+  assert.equal(addComment(review, { time: 1, text: 'x' }).id, 'c03');
+});

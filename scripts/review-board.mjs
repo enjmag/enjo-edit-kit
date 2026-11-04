@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-// Review board: one card per beat of a rendered draft, with Approve / Change,
-// a note box, Draw-on-frame, reference upload, and "New idea". Notes save into
-// <project>/review/REVIEW.json so Claude can fix only the beats you flagged.
+// Review board. Two views of a rendered draft:
+// - Timeline (default for one video): a Frame.io-style player where you pause
+//   anywhere and leave a comment pinned to that timestamp, with an optional
+//   drawing on the frame.
+// - Beats (default for a batch, or --beats): one card per beat with Approve /
+//   Change, a note box, Draw-on-frame, reference upload, and "New idea".
+// Notes save into <project>/review/REVIEW.json so Claude fixes only what you flagged.
 //
 // Usage:
-//   npm run review -- video-projects/<slug> [more projects...]   open the board
+//   npm run review -- video-projects/<slug>                      timeline comments on one video
+//   npm run review -- video-projects/<slug> --beats              beat cards instead
+//   npm run review -- video-projects/<a> video-projects/<b>      a batch (beat cards; add --timeline for comments)
 //   npm run review -- --all                                       every project with a video
 //   npm run review -- video-projects/<slug> --notes               print the to-do list
-//   npm run review -- video-projects/<slug> --mark-revised b03,b05
+//   npm run review -- video-projects/<slug> --mark-revised b03,b05   (or comment ids: c01,c04)
 // Options: --video <file.mp4>  --every <seconds>  --port <n>  --no-open
 
 import { createServer } from 'node:http';
@@ -89,6 +95,14 @@ export function spokenIn(words, start, end) {
 
 // ---------- review state ----------
 
+/** 83.4 -> "1:23.4" */
+export function fmtTime(t) {
+  const n = Math.max(0, Number(t) || 0);
+  const m = Math.floor(n / 60);
+  const sec = (n - m * 60).toFixed(1).padStart(4, '0');
+  return `${m}:${sec}`;
+}
+
 /** Merge freshly detected beats with saved review state, keeping decisions by beat key. */
 export function mergeReview(saved, beats, meta = {}) {
   const prev = new Map((saved?.beats ?? []).map((b) => [b.key, b]));
@@ -112,7 +126,37 @@ export function mergeReview(saved, beats, meta = {}) {
         history: p.history ?? [],
       };
     }),
+    comments: saved?.comments ?? [],
   };
+}
+
+/** Timeline mode: add a comment pinned to a timestamp. */
+export function addComment(review, { time, text = '', drawing = null }, now = new Date().toISOString()) {
+  const t = Number(time);
+  if (!Number.isFinite(t) || t < 0) throw new Error('Bad time');
+  if (!String(text).trim() && !drawing) throw new Error('Write a comment or draw something first');
+  const n = review.comments.reduce((m, c) => Math.max(m, Number(c.id.slice(1)) || 0), 0) + 1;
+  const c = { id: `c${String(n).padStart(2, '0')}`, time: round2(t), text: String(text).slice(0, 4000), drawing, done: false, round: review.round, at: now };
+  review.comments.push(c);
+  review.comments.sort((a, b) => a.time - b.time);
+  review.updatedAt = now;
+  return c;
+}
+
+export function updateComment(review, id, patch, now = new Date().toISOString()) {
+  const c = review.comments.find((x) => x.id === id);
+  if (!c) throw new Error(`Unknown comment ${id}`);
+  if (patch.text !== undefined) c.text = String(patch.text).slice(0, 4000);
+  if (patch.done !== undefined) c.done = Boolean(patch.done);
+  review.updatedAt = now;
+  return c;
+}
+
+export function deleteComment(review, id, now = new Date().toISOString()) {
+  const i = review.comments.findIndex((x) => x.id === id);
+  if (i < 0) throw new Error(`Unknown comment ${id}`);
+  review.comments.splice(i, 1);
+  review.updatedAt = now;
 }
 
 /** Apply one card update from the board. */
@@ -138,6 +182,11 @@ export function summarize(review) {
 /** After Claude fixes the flagged beats: archive their notes and send them back for review. */
 export function markRevised(review, ids, now = new Date().toISOString()) {
   const want = new Set(ids);
+  for (const c of review.comments ?? []) {
+    if (!want.has(c.id)) continue;
+    Object.assign(c, { done: true, resolvedInRound: review.round });
+    want.delete(c.id);
+  }
   const unknown = [...want].filter((id) => !review.beats.some((b) => b.id === id || b.key === id));
   if (unknown.length) throw new Error(`Unknown beats: ${unknown.join(', ')}`);
   for (const b of review.beats) {
@@ -152,6 +201,17 @@ export function markRevised(review, ids, now = new Date().toISOString()) {
 
 export function notesText(review) {
   const s = summarize(review);
+  const comments = review.comments ?? [];
+  if (comments.length && !s.change) {
+    const open = comments.filter((c) => !c.done);
+    const lines = [`${review.project}: round ${review.round}, ${open.length} open comments, ${comments.length - open.length} resolved`];
+    for (const c of open) {
+      lines.push(`- ${c.id} at ${fmtTime(c.time)} (${c.time}s): ${c.text || '(drawing only)'}`);
+      if (c.drawing) lines.push(`    drawing: ${c.drawing}`);
+    }
+    if (!open.length) lines.push('- No open comments.');
+    return lines.join('\n');
+  }
   const lines = [`${review.project}: round ${review.round}, ${s.approved} approved, ${s.change} to change, ${s.waiting} waiting`];
   for (const b of review.beats.filter((x) => x.status === 'change')) {
     lines.push(`- ${b.id} (${b.key}, ${b.start}s-${b.end}s)${b.newIdea ? ' NEW IDEA' : ''}: ${b.note || '(no note)'}`);
@@ -192,7 +252,10 @@ export function loadProject(dir, opts = {}) {
     beats = beatsFromIndex(readFileSync(join(dir, 'index.html'), 'utf8'), read);
     source = 'index.html';
   }
-  if (!beats.length) {
+  if (!beats.length && opts.mode === 'timeline') {
+    if (!video) throw new Error(`No rendered video in ${dir}. Render a draft or pass --video.`);
+    source = 'timeline';
+  } else if (!beats.length) {
     const duration = video ? probeDuration(video) : null;
     if (!duration) throw new Error(`No beats found in ${dir} and no video to split. Add assets/plan.json or pass --video.`);
     beats = beatsByChunks(duration, Number(opts.every) || 3);
@@ -204,7 +267,7 @@ export function loadProject(dir, opts = {}) {
   const reviewPath = join(reviewDir, 'REVIEW.json');
   const review = mergeReview(readJson(reviewPath), beats, { project: basename(dir), video: video ? relative(dir, video).split(sep).join('/') : '' });
   const precheck = readJson(join(reviewDir, 'precheck.json'))?.beats ?? {};
-  return { dir, video, source, review, reviewDir, reviewPath, precheck };
+  return { dir, video, source, review, reviewDir, reviewPath, precheck, mode: opts.mode === 'timeline' ? 'timeline' : 'beats' };
 }
 
 function save(p) {
@@ -300,14 +363,103 @@ render();
 </script></body></html>`;
 }
 
+/** Timeline view: one player, comments pinned to timestamps (like Frame.io). */
+export function timelineHtml(p, base) {
+  const data = JSON.stringify({ review: p.review, base }).replace(/</g, '\\u003c');
+  const videoUrl = p.review.video ? `${base}media/${p.review.video.split('/').map(encodeURIComponent).join('/')}` : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Review: ${esc(p.review.project)}</title>
+<style>
+:root{--bg:#101318;--panel:#181c23;--line:#2a303a;--text:#e9edf2;--dim:#93a0b0;--ok:#3fbf6f;--acc:#f0a63a;--blue:#6f8cff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}header h1{font-size:16px;margin:0}
+.counts{color:var(--dim)}.counts b{color:var(--acc)}
+button{font:inherit;color:var(--text);background:#232934;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}button:hover{border-color:#4a5568}
+button.primary{background:var(--acc);color:#2b1a00;border-color:var(--acc);font-weight:600}
+main{display:grid;grid-template-columns:1fr minmax(300px,400px);gap:18px;padding:16px;max-width:1700px;margin:auto}
+video{width:100%;max-height:68vh;background:#000;border-radius:10px;display:block}
+.track{position:relative;height:26px;margin:10px 0 4px;background:#1d222b;border-radius:6px;cursor:pointer}
+.track .played{position:absolute;left:0;top:0;bottom:0;background:#2c3646;border-radius:6px;pointer-events:none}
+.track .pin{position:absolute;top:3px;width:12px;height:20px;margin-left:-6px;border-radius:4px;background:var(--acc);border:2px solid #101318}.track .pin.done{background:var(--ok);opacity:.6}
+.composer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.at{font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+textarea{width:100%;min-height:70px;background:#0f1216;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;resize:vertical;margin:8px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.dim{color:var(--dim);font-size:13px}
+aside h2{font-size:14px;margin:0 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.c{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.c.done{border-left-color:var(--ok);opacity:.65}.c.now{outline:2px solid var(--blue)}
+.c .t{font-weight:700;color:var(--acc);cursor:pointer;font-variant-numeric:tabular-nums}.c.done .t{color:var(--ok)}
+.c p{margin:6px 0;white-space:pre-wrap}.c img{max-width:100%;border-radius:6px;border:1px solid var(--line);margin-top:4px}
+.c .row button{padding:3px 10px;font-size:13px}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;max-width:95vw}dialog canvas{max-width:85vw;max-height:70vh;cursor:crosshair;border-radius:8px;display:block}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>Review: ${esc(p.review.project)}</h1><span class="counts" id="counts"></span><span style="flex:1"></span>
+<button id="copy">Copy message for Claude</button>${base !== '/' ? '<a href="/" style="color:var(--dim)">all videos</a>' : ''}</header>
+<main><section>
+${videoUrl ? `<video id="v" src="${esc(videoUrl)}" controls playsinline preload="metadata"></video>` : '<p>No rendered video found. Render a draft first.</p>'}
+<div class="track" id="track"><div class="played" id="played"></div></div>
+<div class="composer"><div class="row"><span>Comment at <span class="at" id="at">0:00.0</span></span><span class="dim">The video pauses while you type.</span></div>
+<textarea id="text" placeholder="What should change here? (Ctrl+Enter to post)"></textarea>
+<div class="row"><button class="primary" id="post">Post comment</button><button id="drawBtn">Draw on this frame</button><span class="dim" id="msg"></span></div></div>
+<p class="dim">Pause anywhere, write what to change, and post. Click a comment to jump back to it. When you're done, tell Claude: <code>I left review notes on ${esc(p.review.project)}, let's amend.</code></p>
+</section>
+<aside><h2>Comments</h2><div id="list"></div></aside></main>
+<dialog id="draw"><div class="row"><b id="drawTitle"></b><span style="flex:1"></span>Colour <input type="color" id="pen" value="#ff3b30"><button id="undo">Undo</button></div>
+<canvas id="canvas"></canvas><textarea id="drawNote" placeholder="What should change here?"></textarea>
+<div class="row"><button class="primary" id="drawSave">Post with drawing</button><button id="drawCancel">Cancel</button></div></dialog>
+<script>
+const S=${data};const R=S.review;const base=S.base;
+const $=q=>document.querySelector(q);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=t=>{t=Math.max(0,t||0);const m=Math.floor(t/60);return m+':'+(t-m*60).toFixed(1).padStart(4,'0');};
+const v=$('#v');let pinTime=0;
+async function post(path,body){const r=await fetch(base+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());const j=await r.json();R.comments=j.comments;render();return j;}
+function setAt(){pinTime=v?v.currentTime:0;$('#at').textContent=fmt(pinTime);}
+function render(){const open=R.comments.filter(c=>!c.done).length;$('#counts').innerHTML='<b>'+open+'</b> open · '+(R.comments.length-open)+' resolved · round '+R.round;
+const d=v&&v.duration||0;$('#track').querySelectorAll('.pin').forEach(e=>e.remove());
+if(d)R.comments.forEach(c=>{const e=document.createElement('div');e.className='pin'+(c.done?' done':'');e.style.left=(c.time/d*100)+'%';e.title=fmt(c.time)+' '+c.text;e.onclick=ev=>{ev.stopPropagation();seek(c.time);};$('#track').appendChild(e);});
+$('#list').innerHTML=R.comments.length?R.comments.map(c=>'<div class="c'+(c.done?' done':'')+'" id="'+c.id+'"><div class="row"><span class="t" data-t="'+c.time+'">'+fmt(c.time)+'</span><span class="dim">'+c.id+(c.round>1?' · round '+c.round:'')+'</span></div>'+
+(c.text?'<p>'+esc(c.text)+'</p>':'')+(c.drawing?'<a href="'+base+'media/'+c.drawing+'" target="_blank"><img src="'+base+'media/'+c.drawing+'" alt="drawing"></a>':'')+
+'<div class="row"><button data-done="'+c.id+'">'+(c.done?'Reopen':'Resolve')+'</button><button data-edit="'+c.id+'">Edit</button><button data-del="'+c.id+'">Delete</button></div></div>').join(''):'<p class="dim">No comments yet. Pause the video where something should change and write it below the player.</p>';}
+function seek(t){if(!v)return;v.currentTime=t;v.pause();setAt();}
+$('#list').onclick=async e=>{const t=e.target;try{
+if(t.dataset.t)seek(Number(t.dataset.t));
+else if(t.dataset.done){const c=R.comments.find(x=>x.id===t.dataset.done);await post('comment-update',{id:c.id,patch:{done:!c.done}});}
+else if(t.dataset.edit){const c=R.comments.find(x=>x.id===t.dataset.edit);const n=prompt('Edit comment',c.text);if(n!==null)await post('comment-update',{id:c.id,patch:{text:n}});}
+else if(t.dataset.del){if(confirm('Delete this comment?'))await post('comment-delete',{id:t.dataset.del});}}catch(err){alert('Could not save: '+err.message);}};
+if(v){v.addEventListener('timeupdate',()=>{if(document.activeElement!==$('#text'))setAt();const d=v.duration||1;$('#played').style.width=(v.currentTime/d*100)+'%';
+document.querySelectorAll('.c').forEach(el=>{const c=R.comments.find(x=>x.id===el.id);el.classList.toggle('now',!!c&&Math.abs(c.time-v.currentTime)<0.6);});});
+v.addEventListener('loadedmetadata',render);v.addEventListener('seeked',()=>{if(document.activeElement!==$('#text'))setAt();});}
+$('#track').onclick=e=>{if(!v||!v.duration)return;const r=$('#track').getBoundingClientRect();seek((e.clientX-r.left)/r.width*v.duration);};
+$('#text').addEventListener('focus',()=>{if(v){v.pause();setAt();}});
+$('#text').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('#post').click();}});
+$('#post').onclick=async()=>{const text=$('#text').value.trim();if(!text){$('#msg').textContent='Write something first.';return;}
+try{await post('comment',{time:pinTime,text});$('#text').value='';$('#msg').textContent='Posted at '+fmt(pinTime);}catch(e){alert('Could not save: '+e.message);}};
+$('#copy').onclick=()=>{navigator.clipboard?.writeText('I left review notes on '+R.project+', let\\'s amend.');$('#copy').textContent='Copied';};
+// drawing on the paused frame
+let strokes=[],cur=null,bg=null;const cv=$('#canvas'),ctx=cv.getContext('2d');
+$('#drawBtn').onclick=()=>{if(!v)return;v.pause();setAt();strokes=[];$('#drawTitle').textContent='Draw at '+fmt(pinTime);$('#drawNote').value=$('#text').value;
+const w=v.videoWidth||1920,h=v.videoHeight||1080;cv.width=w;cv.height=h;bg=document.createElement('canvas');bg.width=w;bg.height=h;const g=bg.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,w,h);if(v.readyState>=2)g.drawImage(v,0,0,w,h);redraw();$('#draw').showModal();};
+function redraw(){ctx.drawImage(bg,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=Math.max(4,cv.width/150);for(const s of strokes){ctx.strokeStyle=s.c;ctx.beginPath();s.p.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));ctx.stroke();}}
+function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height];}
+cv.onpointerdown=e=>{cur={c:$('#pen').value,p:[pos(e)]};strokes.push(cur);cv.setPointerCapture(e.pointerId);};
+cv.onpointermove=e=>{if(cur){cur.p.push(pos(e));redraw();}};cv.onpointerup=()=>{cur=null;};
+$('#undo').onclick=()=>{strokes.pop();redraw();};$('#drawCancel').onclick=()=>$('#draw').close();
+$('#drawSave').onclick=async()=>{$('#drawSave').textContent='Saving…';try{await post('comment',{time:pinTime,text:$('#drawNote').value,dataUrl:cv.toDataURL('image/png')});$('#text').value='';$('#draw').close();}catch(e){alert('Could not save: '+e.message);}$('#drawSave').textContent='Post with drawing';};
+render();
+</script></body></html>`;
+}
+
 function indexHtml(projects) {
   const rows = projects.map((p, i) => {
     const s = summarize(p.review);
-    return `<li><a href="/p/${i}/">${esc(p.review.project)}</a> <span>${s.approved} approved · ${s.change} to change · ${s.waiting} waiting</span></li>`;
+    const open = (p.review.comments ?? []).filter((c) => !c.done).length;
+    const info = p.mode === 'timeline' ? `${open} open comments` : `${s.approved} approved · ${s.change} to change · ${s.waiting} waiting`;
+    return `<li><a href="/p/${i}/">${esc(p.review.project)}</a> <span>${info}</span></li>`;
   }).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Review boards</title>
 <style>body{margin:0;padding:24px 16px;background:#101318;color:#e9edf2;font:16px/1.5 system-ui,Segoe UI,sans-serif}ul{list-style:none;padding:0;max-width:720px}li{background:#181c23;border:1px solid #2a303a;border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}a{color:#9fb4ff;font-weight:600}span{color:#93a0b0}</style></head>
-<body><h1>Review boards</h1><p>Open each video, approve or flag every beat, then tell Claude which videos you reviewed.</p><ul>${rows}</ul></body></html>`;
+<body><h1>Review boards</h1><p>Open each video, leave your notes, then tell Claude which videos you reviewed.</p><ul>${rows}</ul></body></html>`;
 }
 
 // ---------- server ----------
@@ -368,13 +520,25 @@ export function startServer(projects, port = 4848) {
       if (req.method === 'GET' && rest === '') {
         p.precheck = readJson(join(p.reviewDir, 'precheck.json'))?.beats ?? {};
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        return res.end(boardHtml(p, base));
+        return res.end(p.mode === 'timeline' ? timelineHtml(p, base) : boardHtml(p, base));
       }
       if (req.method === 'GET' && rest.startsWith('media/')) {
         const file = resolve(p.dir, rest.slice(6));
         const inside = file.startsWith(p.dir + sep) || (p.video && file === resolve(p.video));
         if (!inside || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end('Not found'); }
         return sendFile(req, res, file);
+      }
+      if (req.method === 'POST' && ['comment', 'comment-update', 'comment-delete'].includes(rest)) {
+        if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
+        const body = await readBody(req);
+        if (rest === 'comment') {
+          const drawing = body.dataUrl ? saveImage(p, `t${Math.round(Number(body.time) * 10)}`, 'drawings', body.dataUrl) : null;
+          addComment(p.review, { time: body.time, text: body.text, drawing });
+        } else if (rest === 'comment-update') updateComment(p.review, body.id, body.patch ?? {});
+        else deleteComment(p.review, body.id);
+        save(p);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ comments: p.review.comments }));
       }
       if (req.method === 'POST' && ['save', 'drawing', 'upload'].includes(rest)) {
         if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
@@ -420,6 +584,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (a === '--every') opts.every = args[++i];
     else if (a === '--port') opts.port = Number(args[++i]);
     else if (a === '--no-open') opts.open = false;
+    else if (a === '--beats') opts.mode = 'beats';
+    else if (a === '--timeline') opts.mode = 'timeline';
     else if (a === '--notes') opts.notes = true;
     else if (a === '--mark-revised') opts.revised = args[++i]?.split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--all') opts.all = true;
@@ -434,10 +600,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
   }
   if (opts.help || !opts.dirs.length) {
-    console.log('Usage: npm run review -- video-projects/<slug> [more...] | --all  [--notes] [--mark-revised b01,b02] [--video file] [--every 3] [--port 4848] [--no-open]');
+    console.log('Usage: npm run review -- video-projects/<slug> [more...] | --all  [--timeline | --beats] [--notes] [--mark-revised b01,c02] [--video file] [--every 3] [--port 4848] [--no-open]');
     process.exit(opts.help ? 0 : 1);
   }
   if (opts.video && opts.dirs.length > 1) { console.error('--video works with one project at a time.'); process.exit(1); }
+  // One video gets Frame.io-style timestamp comments; a batch gets beat cards.
+  if (!opts.mode) opts.mode = opts.dirs.length === 1 && !opts.every ? 'timeline' : 'beats';
   let projects;
   try { projects = opts.dirs.map((d) => loadProject(d, opts)); }
   catch (e) { console.error(e.message); process.exit(1); }
@@ -454,7 +622,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     startServer(projects, opts.port).then(() => {
       const url = `http://127.0.0.1:${opts.port}/`;
       console.log(`Review board running at ${url}`);
-      for (const p of projects) { const s = summarize(p.review); console.log(`- ${p.review.project}: ${s.total} beats (${p.source}), notes save to ${relative(process.cwd(), p.reviewPath)}`); }
+      for (const p of projects) {
+        const s = summarize(p.review);
+        const what = p.mode === 'timeline' ? `timestamp comments (${p.review.comments.length} so far)` : `${s.total} beats (${p.source})`;
+        console.log(`- ${p.review.project}: ${what}, notes save to ${relative(process.cwd(), p.reviewPath)}`);
+      }
       console.log('Leave this window open while you review. Press Ctrl+C when you are done.');
       if (opts.open) openBrowser(url);
     }, (e) => { console.error(e.code === 'EADDRINUSE' ? `Port ${opts.port} is busy. Close the other board or add --port 4849.` : e.message); process.exit(1); });

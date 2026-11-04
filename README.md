@@ -148,14 +148,19 @@ Client folders are gitignored, so briefs and results stay on your computer.
 
 ## Review drafts beat by beat
 
-After a draft render, Claude pre-checks every beat against the brief and opens a
-review board in your browser. Each beat has its clip, what is said, what is on
-screen, and Approve, Change, Draw, Upload reference, and New idea buttons. Your
-notes save into the project's `review/` folder.
+After a draft render, Claude opens a review board in your browser. Your notes
+save into the project's `review/` folder.
+
+- **One video:** a Frame.io-style player. Pause anywhere, type what to change,
+  and the comment is pinned to that timestamp (with an optional drawing on the
+  frame). Pins show on the timeline; click one to jump back.
+- **A batch:** one card per beat with its clip, what is said, what is on screen,
+  Claude's pre-check, and Approve, Change, Draw, Upload reference, and New idea.
 
 ```sh
-npm run review -- video-projects/my-video
-npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch
+npm run review -- video-projects/my-video                   # timestamp comments
+npm run review -- video-projects/my-video --beats           # beat cards for one video
+npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch (beat cards)
 npm run review -- --all                                     # every project with a render
 ```
 
