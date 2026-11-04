@@ -55,7 +55,7 @@ Edit the body first, because every ad shares it. Then each hook.
    npm run stitch -- video-projects/<hook>/renders/hook.mp4 video-projects/<body>/renders/body.mp4 --out video-projects/<hook>/renders/<ad>.mp4
    ```
 
-   Then mix one music bed and the SFX across the whole ad, master, and watch and
+   Then mix one music bed and the SFX across the whole ad (`npm run mix`), master, and watch and
    listen across the join: matching framing, no jump in level, no clipped word.
 6. Fill `VARIANTS.json` with the files and give the user one `PERFORMANCE.md` row
    per ad with the hook type filled in, so results can be compared by hook.

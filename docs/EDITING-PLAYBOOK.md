@@ -112,7 +112,7 @@ Rules that came from mistakes:
 - 1 to 3 words per chunk, split on phrase boundaries. They hard-swap with no pop animation and appear 2 frames before the first word.
 - Montserrat ExtraBold, all caps, about 62 to 64 px, with a heavy serif accent (Abril Fatface) on 5 to 20% of chunks for soft words. Never two serif chunks in a row.
 - Color on 25 to 45% of chunks, whole chunk only: red for the wrong way or a loss, teal for the concept or keyword, green for the action or payoff.
-- **No orphan words:** one line per chunk by default. Never leave a single word alone on a line; re-split the chunk instead.
+- **No orphan words:** one line per chunk by default. Never leave a single word alone on a line ("than what most people would / do." reads as a mistake); re-split the chunk or pull a word forward instead. `npm run captions:build -- <transcript.json> --out caps.js` makes the chunks, and `npm run captions:check -- <project>` measures every caption in the browser and fails on a wrap, an overflow, or a lone word.
 - **One look for the whole reel:** every caption in the same dark box with a thin light edge, so it reads on black, white, and footage alike. Mixing boxed and bare captions looked cheap.
 - **Never white on light.** Measure the pixels behind every caption.
 - Position: on the seam in a split, on the shirt in a punch-in (not the jaw), and in a clear zone when the shot is text to read.
@@ -176,3 +176,4 @@ The agent checks its own work before you see it:
 - With FFmpeg 6, the silence-cut script's filter graph can be run with `-filter_complex_script <file>`, mapping `[v]` and `[a]`, if updating FFmpeg isn't possible.
 - Preflight flags a root `data-start="0"` when the composition has an inline video, but lint requires it. Keep it; the render validates it.
 - A raw recording caps the edit. A clip with no hook and no CTA scores low no matter how well it's cut. Script the hook before you record.
+- **Listen for hesitations, not just mistakes.** Listen through every sentence for hesitations and restarts before Draft 1; a clean transcript does not mean clean delivery. The mistake detector and a transcript read both missed "once, and then ... they forget about it" (two 0.45 s hanging pauses inside one phrase). Look for gaps of 0.3 s or more inside a phrase, cut them at true silence keeping every word, and alternate the framing on the new jump cuts.
