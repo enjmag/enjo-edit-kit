@@ -18,6 +18,7 @@
     "new-batch": "node scripts/new-batch.mjs",
     "plan:script": "node scripts/plan-from-script.mjs",
     "stitch": "node scripts/stitch-variant.mjs",
+    "review": "node scripts/review-board.mjs",
     "captions:build": "node scripts/build-captions.mjs",
     "captions:check": "node scripts/check-captions.mjs",
     "mix": "node scripts/mix-bed.mjs",

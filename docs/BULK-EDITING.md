@@ -48,7 +48,7 @@ Edit the body first, because every ad shares it. Then each hook.
    Render hooks and the body without music so the bed can run across the join.
 4. Review every hook and the body on one board:
    `npm run review -- video-projects/<batch>-body video-projects/<batch>-h01 ...`
-   (when the review board is installed). A note on the body fixes every ad at once.
+   A note on the body fixes every ad at once.
 5. Join each hook to the body:
 
    ```sh
