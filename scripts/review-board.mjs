@@ -612,7 +612,7 @@ export function startServer(projects, port = 4848) {
           if (process.env.REVIEW_AMEND === 'off') {
             message = `Saved. Tell Claude: I left review notes on ${p.review.project}, let's amend.`;
           } else {
-            runAmend(p, process.cwd());
+            try { runAmend(p, process.cwd()); } catch (e) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
             p.review.amend = { state: 'sent', at };
             message = `Sent ${open} notes. Claude is working on them.`;
           }
@@ -713,7 +713,9 @@ export function amendSummary(event) {
 function runAmend(p, kitRoot) {
   const job = amendJobs.get(p.dir);
   if (job?.state === 'running') return job;
-  const cfg = readJson(join(p.dir, 'amend.json')) ?? {};
+  const cfgPath = join(p.dir, 'amend.json');
+  const cfg = readJson(cfgPath) ?? {};
+  if (existsSync(cfgPath) && !readJson(cfgPath)) throw new Error('amend.json is not valid JSON (use forward slashes or double backslashes in paths)');
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'acceptEdits',
     '--allowedTools', ...AMEND_TOOLS, ...(cfg.allowedTools ?? [])];
   for (const d of cfg.addDirs ?? []) args.push('--add-dir', d);
