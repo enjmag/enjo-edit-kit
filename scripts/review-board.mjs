@@ -127,6 +127,7 @@ export function mergeReview(saved, beats, meta = {}) {
       };
     }),
     comments: saved?.comments ?? [],
+    amend: saved?.amend ?? null,
   };
 }
 
@@ -195,6 +196,7 @@ export function markRevised(review, ids, now = new Date().toISOString()) {
     Object.assign(b, { status: 'waiting', newIdea: false, note: '', drawings: [], uploads: [], revisedInRound: review.round });
   }
   review.round += 1;
+  review.amend = null;
   review.updatedAt = now;
   return review;
 }
@@ -305,12 +307,12 @@ main{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:20px;padding
 textarea{width:100%;min-height:64px;background:#0f1216;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;resize:vertical}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.saved{color:var(--dim);font-size:12px}
 .thumbs{display:flex;gap:6px;flex-wrap:wrap}.thumbs img{height:70px;border-radius:6px;border:1px solid var(--line)}
-.history{color:var(--dim);font-size:13px}
+.history{color:var(--dim);font-size:13px}.dim{color:var(--dim);font-size:13px}button.primary{background:var(--chg);color:#2b1a00;border-color:var(--chg);font-weight:600}
 dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;max-width:95vw}dialog canvas{max-width:85vw;max-height:70vh;cursor:crosshair;border-radius:8px;display:block}
 @media(max-width:860px){header{position:static}main{grid-template-columns:1fr}.player{position:static}.card{grid-template-columns:1fr}}
 </style></head><body>
 <header><h1>Review: ${esc(p.review.project)}</h1><div class="counts"><span class="a" id="nA"></span><span class="c" id="nC"></span><span class="w" id="nW"></span></div>
-<div class="bar" id="bar"></div><button id="next">Next to review ↓</button><button id="copy">Copy message for Claude</button></header>
+<div class="bar" id="bar"></div><button id="next">Next to review ↓</button>${finishButtons(p.review)}</header>
 <main><div class="player">${videoUrl ? `<video id="main" src="${esc(videoUrl)}" controls playsinline preload="metadata"></video>` : '<p>No rendered video found. Render a draft first.</p>'}
 <p class="help">Watch each beat, then press <b>Approve</b> or <b>Change</b> and say what to change. <b>Draw</b> lets you mark the frame. Notes save by themselves.<br>When you're done, tell Claude: <code>I left review notes on ${esc(p.review.project)}, let's amend.</code></p>
 <p class="help">Round ${p.review.round} · beats from ${esc(p.source)}${base !== '/' ? ' · <a href="/" style="color:inherit">all videos</a>' : ''}</p></div>
@@ -347,7 +349,7 @@ async function update(b,patch,rerender){try{const res=await post('save',{beat:b.
 function render(focus){const c=$('#cards');const y=scrollY;c.innerHTML='';R.beats.forEach(b=>c.appendChild(card(b)));counts();scrollTo(0,y);}
 $('#bar').onclick=e=>{const id=e.target.dataset.id;if(id)document.getElementById(id).scrollIntoView({behavior:'smooth',block:'center'});};
 $('#next').onclick=()=>{const b=R.beats.find(x=>x.status==='waiting');if(b)document.getElementById(b.id).scrollIntoView({behavior:'smooth',block:'center'});};
-$('#copy').onclick=()=>{navigator.clipboard?.writeText('I left review notes on '+R.project+', let\\'s amend.');$('#copy').textContent='Copied';};
+${FINISH_JS}
 // drawing
 let strokes=[],cur=null,drawBeat=null,bg=null;const cv=$('#canvas'),ctx=cv.getContext('2d');
 function openDraw(b,v){drawBeat=b;strokes=[];$('#drawTitle').textContent='Draw on '+b.id+' (pause the clip on the frame you want first)';$('#drawNote').value='';
@@ -363,7 +365,19 @@ render();
 </script></body></html>`;
 }
 
-/** Timeline view: one player, comments pinned to timestamps (like Frame.io). */
+/** Header buttons shared by both views: finish the review without going back to Claude. */
+function finishButtons(review) {
+  const a = review.amend;
+  const label = a?.state === 'sent' ? `Sent for amend ${new Date(a.at).toLocaleTimeString()}` : a?.state === 'approved' ? 'Approved' : '';
+  return `<span class="dim" id="finishState">${esc(label)}</span><button id="approveAll">✓ Approve video</button><button class="primary" id="sendAmend">Send notes for amend</button>`;
+}
+const FINISH_JS = `
+async function finish(kind){const msg=kind==='amend'?'Send your notes to Claude now? A Claude window opens on this PC and starts the amend.':'Approve this video with no changes?';if(!confirm(msg))return;
+try{const r=await fetch(base+'finish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind})});const j=await r.json();if(!r.ok)throw new Error(j.error||'failed');
+document.getElementById('finishState').textContent=j.message;}catch(e){alert('Could not send: '+e.message);}}
+document.getElementById('sendAmend').onclick=()=>finish('amend');document.getElementById('approveAll').onclick=()=>finish('approve');`;
+
+/** Timeline view: one player, comments pinned to timestamps, drawing right on the frame (like Frame.io). */
 export function timelineHtml(p, base) {
   const data = JSON.stringify({ review: p.review, base }).replace(/</g, '\\u003c');
   const videoUrl = p.review.video ? `${base}media/${p.review.video.split('/').map(encodeURIComponent).join('/')}` : '';
@@ -372,12 +386,14 @@ export function timelineHtml(p, base) {
 <style>
 :root{--bg:#101318;--panel:#181c23;--line:#2a303a;--text:#e9edf2;--dim:#93a0b0;--ok:#3fbf6f;--acc:#f0a63a;--blue:#6f8cff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-header{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}header h1{font-size:16px;margin:0}
+header{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}header h1{font-size:16px;margin:0}
 .counts{color:var(--dim)}.counts b{color:var(--acc)}
 button{font:inherit;color:var(--text);background:#232934;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}button:hover{border-color:#4a5568}
-button.primary{background:var(--acc);color:#2b1a00;border-color:var(--acc);font-weight:600}
+button.primary{background:var(--acc);color:#2b1a00;border-color:var(--acc);font-weight:600}button.on{background:#ff3b30;border-color:#ff3b30;color:#fff}
 main{display:grid;grid-template-columns:1fr minmax(300px,400px);gap:18px;padding:16px;max-width:1700px;margin:auto}
-video{width:100%;max-height:68vh;background:#000;border-radius:10px;display:block}
+.stage{position:relative}video{width:100%;max-height:68vh;background:#000;border-radius:10px;display:block}
+#ov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;border-radius:10px}.stage.drawing #ov{pointer-events:auto;cursor:crosshair;outline:3px solid #ff3b30}
+.tools{display:none;gap:8px;align-items:center;margin-top:8px}.stage.drawing+.tools{display:flex}
 .track{position:relative;height:26px;margin:10px 0 4px;background:#1d222b;border-radius:6px;cursor:pointer}
 .track .played{position:absolute;left:0;top:0;bottom:0;background:#2c3646;border-radius:6px;pointer-events:none}
 .track .pin{position:absolute;top:3px;width:12px;height:20px;margin-left:-6px;border-radius:4px;background:var(--acc);border:2px solid #101318}.track .pin.done{background:var(--ok);opacity:.6}
@@ -391,29 +407,27 @@ aside h2{font-size:14px;margin:0 0 8px;color:var(--dim);text-transform:uppercase
 .c .t{font-weight:700;color:var(--acc);cursor:pointer;font-variant-numeric:tabular-nums}.c.done .t{color:var(--ok)}
 .c p{margin:6px 0;white-space:pre-wrap}.c img{max-width:100%;border-radius:6px;border:1px solid var(--line);margin-top:4px}
 .c .row button{padding:3px 10px;font-size:13px}
-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;max-width:95vw}dialog canvas{max-width:85vw;max-height:70vh;cursor:crosshair;border-radius:8px;display:block}
 @media(max-width:900px){main{grid-template-columns:1fr}}
 </style></head><body>
 <header><h1>Review: ${esc(p.review.project)}</h1><span class="counts" id="counts"></span><span style="flex:1"></span>
-<button id="copy">Copy message for Claude</button>${base !== '/' ? '<a href="/" style="color:var(--dim)">all videos</a>' : ''}</header>
+${finishButtons(p.review)}${base !== '/' ? '<a href="/" style="color:var(--dim)">all videos</a>' : ''}</header>
 <main><section>
-${videoUrl ? `<video id="v" src="${esc(videoUrl)}" controls playsinline preload="metadata"></video>` : '<p>No rendered video found. Render a draft first.</p>'}
+<div class="stage" id="stage">${videoUrl ? `<video id="v" src="${esc(videoUrl)}" controls playsinline preload="metadata"></video><canvas id="ov"></canvas>` : '<p>No rendered video found. Render a draft first.</p>'}</div>
+<div class="tools"><b>Drawing</b><span class="dim">Draw on the frame, then write your comment and post.</span><span style="flex:1"></span>Colour <input type="color" id="pen" value="#ff3b30"><button id="undo">Undo</button><button id="clear">Clear</button></div>
 <div class="track" id="track"><div class="played" id="played"></div></div>
-<div class="composer"><div class="row"><span>Comment at <span class="at" id="at">0:00.0</span></span><span class="dim">The video pauses while you type.</span></div>
+<div class="composer"><div class="row"><span>Comment at <span class="at" id="at">0:00.0</span></span><span class="dim">The video pauses while you type or draw.</span></div>
 <textarea id="text" placeholder="What should change here? (Ctrl+Enter to post)"></textarea>
-<div class="row"><button class="primary" id="post">Post comment</button><button id="drawBtn">Draw on this frame</button><span class="dim" id="msg"></span></div></div>
-<p class="dim">Pause anywhere, write what to change, and post. Click a comment to jump back to it. When you're done, tell Claude: <code>I left review notes on ${esc(p.review.project)}, let's amend.</code></p>
+<div class="row"><button class="primary" id="post">Post comment</button><button id="drawBtn">✎ Draw on frame</button><span class="dim" id="msg"></span></div></div>
+<p class="dim">Pause anywhere, write what to change, and post. Click a comment to jump back to it. When you're done, press <b>Send notes for amend</b> and Claude starts fixing them on this PC, or <b>Approve video</b> if nothing needs to change.</p>
 </section>
 <aside><h2>Comments</h2><div id="list"></div></aside></main>
-<dialog id="draw"><div class="row"><b id="drawTitle"></b><span style="flex:1"></span>Colour <input type="color" id="pen" value="#ff3b30"><button id="undo">Undo</button></div>
-<canvas id="canvas"></canvas><textarea id="drawNote" placeholder="What should change here?"></textarea>
-<div class="row"><button class="primary" id="drawSave">Post with drawing</button><button id="drawCancel">Cancel</button></div></dialog>
 <script>
 const S=${data};const R=S.review;const base=S.base;
 const $=q=>document.querySelector(q);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=t=>{t=Math.max(0,t||0);const m=Math.floor(t/60);return m+':'+(t-m*60).toFixed(1).padStart(4,'0');};
 const v=$('#v');let pinTime=0;
 async function post(path,body){const r=await fetch(base+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());const j=await r.json();R.comments=j.comments;render();return j;}
+const busy=()=>document.activeElement===$('#text')||$('#stage').classList.contains('drawing');
 function setAt(){pinTime=v?v.currentTime:0;$('#at').textContent=fmt(pinTime);}
 function render(){const open=R.comments.filter(c=>!c.done).length;$('#counts').innerHTML='<b>'+open+'</b> open · '+(R.comments.length-open)+' resolved · round '+R.round;
 const d=v&&v.duration||0;$('#track').querySelectorAll('.pin').forEach(e=>e.remove());
@@ -427,25 +441,28 @@ if(t.dataset.t)seek(Number(t.dataset.t));
 else if(t.dataset.done){const c=R.comments.find(x=>x.id===t.dataset.done);await post('comment-update',{id:c.id,patch:{done:!c.done}});}
 else if(t.dataset.edit){const c=R.comments.find(x=>x.id===t.dataset.edit);const n=prompt('Edit comment',c.text);if(n!==null)await post('comment-update',{id:c.id,patch:{text:n}});}
 else if(t.dataset.del){if(confirm('Delete this comment?'))await post('comment-delete',{id:t.dataset.del});}}catch(err){alert('Could not save: '+err.message);}};
-if(v){v.addEventListener('timeupdate',()=>{if(document.activeElement!==$('#text'))setAt();const d=v.duration||1;$('#played').style.width=(v.currentTime/d*100)+'%';
+if(v){v.addEventListener('timeupdate',()=>{if(!busy())setAt();const d=v.duration||1;$('#played').style.width=(v.currentTime/d*100)+'%';
 document.querySelectorAll('.c').forEach(el=>{const c=R.comments.find(x=>x.id===el.id);el.classList.toggle('now',!!c&&Math.abs(c.time-v.currentTime)<0.6);});});
-v.addEventListener('loadedmetadata',render);v.addEventListener('seeked',()=>{if(document.activeElement!==$('#text'))setAt();});}
+v.addEventListener('loadedmetadata',render);v.addEventListener('seeked',()=>{if(!busy())setAt();});v.addEventListener('play',()=>{if($('#stage').classList.contains('drawing'))stopDraw(true);});}
 $('#track').onclick=e=>{if(!v||!v.duration)return;const r=$('#track').getBoundingClientRect();seek((e.clientX-r.left)/r.width*v.duration);};
-$('#text').addEventListener('focus',()=>{if(v){v.pause();setAt();}});
+$('#text').addEventListener('focus',()=>{if(v&&!v.paused){v.pause();}if(!$('#stage').classList.contains('drawing'))setAt();});
 $('#text').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();$('#post').click();}});
-$('#post').onclick=async()=>{const text=$('#text').value.trim();if(!text){$('#msg').textContent='Write something first.';return;}
-try{await post('comment',{time:pinTime,text});$('#text').value='';$('#msg').textContent='Posted at '+fmt(pinTime);}catch(e){alert('Could not save: '+e.message);}};
-$('#copy').onclick=()=>{navigator.clipboard?.writeText('I left review notes on '+R.project+', let\\'s amend.');$('#copy').textContent='Copied';};
-// drawing on the paused frame
-let strokes=[],cur=null,bg=null;const cv=$('#canvas'),ctx=cv.getContext('2d');
-$('#drawBtn').onclick=()=>{if(!v)return;v.pause();setAt();strokes=[];$('#drawTitle').textContent='Draw at '+fmt(pinTime);$('#drawNote').value=$('#text').value;
-const w=v.videoWidth||1920,h=v.videoHeight||1080;cv.width=w;cv.height=h;bg=document.createElement('canvas');bg.width=w;bg.height=h;const g=bg.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,w,h);if(v.readyState>=2)g.drawImage(v,0,0,w,h);redraw();$('#draw').showModal();};
-function redraw(){ctx.drawImage(bg,0,0);ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=Math.max(4,cv.width/150);for(const s of strokes){ctx.strokeStyle=s.c;ctx.beginPath();s.p.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));ctx.stroke();}}
-function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height];}
-cv.onpointerdown=e=>{cur={c:$('#pen').value,p:[pos(e)]};strokes.push(cur);cv.setPointerCapture(e.pointerId);};
-cv.onpointermove=e=>{if(cur){cur.p.push(pos(e));redraw();}};cv.onpointerup=()=>{cur=null;};
-$('#undo').onclick=()=>{strokes.pop();redraw();};$('#drawCancel').onclick=()=>$('#draw').close();
-$('#drawSave').onclick=async()=>{$('#drawSave').textContent='Saving…';try{await post('comment',{time:pinTime,text:$('#drawNote').value,dataUrl:cv.toDataURL('image/png')});$('#text').value='';$('#draw').close();}catch(e){alert('Could not save: '+e.message);}$('#drawSave').textContent='Post with drawing';};
+// drawing straight on the player; strokes are stored as 0-1 positions inside the picture
+const ov=$('#ov'),ctx=ov?ov.getContext('2d'):null;let strokes=[],cur=null;
+function picRect(){const w=ov.clientWidth,h=ov.clientHeight,va=(v.videoWidth||16)/(v.videoHeight||9);let pw=w,ph=w/va;if(ph>h){ph=h;pw=h*va;}return{x:(w-pw)/2,y:(h-ph)/2,w:pw,h:ph};}
+function paint(g,r,lw){g.lineCap='round';g.lineJoin='round';g.lineWidth=lw;for(const s of strokes){g.strokeStyle=s.c;g.beginPath();s.p.forEach((q,i)=>{const x=r.x+q[0]*r.w,y=r.y+q[1]*r.h;i?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();}}
+function redraw(){if(!ov)return;ov.width=ov.clientWidth*devicePixelRatio;ov.height=ov.clientHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.clearRect(0,0,ov.width,ov.height);paint(ctx,picRect(),4);}
+function startDraw(){if(!v)return;v.pause();setAt();v.controls=false;$('#stage').classList.add('drawing');$('#drawBtn').classList.add('on');$('#drawBtn').textContent='Stop drawing';redraw();}
+function stopDraw(clear){$('#stage').classList.remove('drawing');$('#drawBtn').classList.remove('on');$('#drawBtn').textContent='✎ Draw on frame';v.controls=true;if(clear){strokes=[];}redraw();}
+$('#drawBtn').onclick=()=>$('#stage').classList.contains('drawing')?stopDraw(false):startDraw();
+if(ov){const pos=e=>{const b=ov.getBoundingClientRect(),r=picRect();return[(e.clientX-b.left-r.x)/r.w,(e.clientY-b.top-r.y)/r.h];};
+ov.onpointerdown=e=>{cur={c:$('#pen').value,p:[pos(e)]};strokes.push(cur);ov.setPointerCapture(e.pointerId);};
+ov.onpointermove=e=>{if(cur){cur.p.push(pos(e));redraw();}};ov.onpointerup=()=>{cur=null;};addEventListener('resize',redraw);}
+$('#undo').onclick=()=>{strokes.pop();redraw();};$('#clear').onclick=()=>{strokes=[];redraw();};
+function snapshot(){const w=v.videoWidth||1920,h=v.videoHeight||1080,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#222';g.fillRect(0,0,w,h);try{g.drawImage(v,0,0,w,h);}catch(e){}paint(g,{x:0,y:0,w:w,h:h},Math.max(4,w/150));return c.toDataURL('image/png');}
+$('#post').onclick=async()=>{const text=$('#text').value.trim();const drew=strokes.length>0;if(!text&&!drew){$('#msg').textContent='Write something or draw first.';return;}
+try{await post('comment',{time:pinTime,text,dataUrl:drew?snapshot():undefined});$('#text').value='';stopDraw(true);$('#msg').textContent='Posted at '+fmt(pinTime);}catch(e){alert('Could not save: '+e.message);}};
+${FINISH_JS}
 render();
 </script></body></html>`;
 }
@@ -528,6 +545,26 @@ export function startServer(projects, port = 4848) {
         if (!inside || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end('Not found'); }
         return sendFile(req, res, file);
       }
+      if (req.method === 'POST' && rest === 'finish') {
+        if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
+        const body = await readBody(req);
+        const at = new Date().toISOString();
+        let message;
+        if (body.kind === 'approve') {
+          p.review.amend = { state: 'approved', at };
+          message = 'Approved. Nothing will change.';
+        } else {
+          const open = (p.review.comments ?? []).filter((c) => !c.done).length + p.review.beats.filter((b) => b.status === 'change').length;
+          if (!open) { res.writeHead(400, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: 'There are no open notes to amend.' })); }
+          const r = launchAmend(p, process.cwd());
+          p.review.amend = { state: 'sent', at, launched: r.launched };
+          message = r.launched ? `Sent ${open} notes. A Claude window is opening on this PC.` : `Saved, but Claude could not be opened (${r.why}). Tell Claude: I left review notes on ${p.review.project}, let's amend.`;
+        }
+        p.review.updatedAt = at;
+        save(p);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ message }));
+      }
       if (req.method === 'POST' && ['comment', 'comment-update', 'comment-delete'].includes(rest)) {
         if (req.headers.origin && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(req.headers.origin)) { res.writeHead(403); return res.end('Forbidden'); }
         const body = await readBody(req);
@@ -566,6 +603,38 @@ export function startServer(projects, port = 4848) {
     server.once('error', fail);
     server.listen(port, '127.0.0.1', () => ok(server));
   });
+}
+
+/** The message the amend session starts with. Plain words only, so it survives the shell. */
+export function amendPrompt(p, kitRoot) {
+  const rel = relative(kitRoot, p.dir).split(sep).join('/');
+  return `I left review notes on ${rel}. Run npm run review -- ${rel} --notes to read them. ` +
+    `If ${rel}/AMEND.md exists, follow it for how this project is built. ` +
+    `Fix only what the notes flag, render the next numbered draft without overwriting earlier drafts, ` +
+    `copy it into ${rel}/renders, then run npm run review -- ${rel} --mark-revised with the ids you fixed ` +
+    `and add any lasting lesson to the client rules.`;
+}
+
+/** Opens a visible Claude Code window in the kit folder with the amend prompt (Windows, macOS, Linux). */
+function launchAmend(p, kitRoot) {
+  if (process.env.REVIEW_AMEND === 'off') return { launched: false, why: 'REVIEW_AMEND=off' };
+  const prompt = amendPrompt(p, kitRoot).replace(/["%^&|<>`$\\]/g, ' ');
+  try {
+    if (process.platform === 'win32') {
+      const cmdFile = join(p.reviewDir, 'amend.cmd');
+      writeFileSync(cmdFile, `@echo off\r\ntitle Claude amend - ${p.review.project}\r\ncd /d "${kitRoot}"\r\nclaude "${prompt}"\r\n`);
+      spawn('cmd', ['/c', 'start', '""', `"${cmdFile}"`], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).on('error', () => {}).unref();
+    } else if (process.platform === 'darwin') {
+      const sh = join(p.reviewDir, 'amend.command');
+      writeFileSync(sh, `#!/bin/sh\ncd "${kitRoot}"\nclaude "${prompt}"\n`, { mode: 0o755 });
+      spawn('open', [sh], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    } else {
+      spawn('x-terminal-emulator', ['-e', 'sh', '-c', `cd "${kitRoot}" && claude "${prompt}"`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    }
+    return { launched: true };
+  } catch (e) {
+    return { launched: false, why: e.message };
+  }
 }
 
 function openBrowser(url) {

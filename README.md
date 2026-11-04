@@ -164,8 +164,12 @@ npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch (beat card
 npm run review -- --all                                     # every project with a render
 ```
 
-When you're done, tell Claude "I left review notes on my-video, let's amend."
-It changes only the flagged beats, sends them back for another look, and adds
+When you're done, press **Send notes for amend** on the board. A Claude Code
+window opens in the kit folder and starts the amend by itself. If the project
+has an `AMEND.md`, Claude follows it to rebuild that video. Press **Approve video**
+if nothing needs to change. To turn the button off, set `REVIEW_AMEND=off` and
+tell Claude "I left review notes on my-video, let's amend" instead.
+Claude changes only the flagged beats, sends them back for another look, and adds
 each note to the client's rules so you never give it twice.
 
 ## Make a motion-design showreel
