@@ -28,6 +28,7 @@ For one stage, load the matching local skill:
 | Full raw-video edit | `edit-video` |
 | Set up or complete a client brief and brand kit | `client-brief` |
 | Turn published results into editing rules | `performance-review` |
+| One body with many hooks (bulk ad batches) | `short-form-edit` with `docs/BULK-EDITING.md` |
 | Beat-by-beat review of drafts, single or in bulk | `review-board` |
 | Silence removal | `cut-silences` |
 | Retakes, false starts, or stutters | `cut-mistakes` |
