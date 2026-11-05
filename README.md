@@ -148,19 +148,32 @@ Client folders are gitignored, so briefs and results stay on your computer.
 
 ## Review drafts beat by beat
 
-After a draft render, Claude pre-checks every beat against the brief and opens a
-review board in your browser. Each beat has its clip, what is said, what is on
-screen, and Approve, Change, Draw, Upload reference, and New idea buttons. Your
-notes save into the project's `review/` folder.
+After a draft render, Claude opens a review board in your browser. Your notes
+save into the project's `review/` folder.
+
+- **One video:** a Frame.io-style player. Pause anywhere, type what to change,
+  and the comment is pinned to that timestamp (with an optional drawing on the
+  frame). Pins show on the timeline; click one to jump back.
+- **A batch:** one card per beat with its clip, what is said, what is on screen,
+  Claude's pre-check, and Approve, Change, Draw, Upload reference, and New idea.
 
 ```sh
-npm run review -- video-projects/my-video
-npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch
+npm run review -- video-projects/my-video                   # timestamp comments
+npm run review -- video-projects/my-video --beats           # beat cards for one video
+npm run review -- video-projects/ad-1 video-projects/ad-2   # a batch (beat cards)
 npm run review -- --all                                     # every project with a render
 ```
 
-When you're done, tell Claude "I left review notes on my-video, let's amend."
-It changes only the flagged beats, sends them back for another look, and adds
+When you're done, press **Send notes for amend** on the board. Claude Code runs
+in the background (no terminal), shows its steps on the board, and loads the
+new draft when it's done. It may edit files and run the kit's tools (node,
+python, ffmpeg, npm run). A project's `amend.json` can add folders
+(`addDirs`) or tools (`allowedTools`). Claude Code must be signed in on the
+PC once (`claude`, then `/login`). If the project
+has an `AMEND.md`, Claude follows it to rebuild that video. Press **Approve video**
+if nothing needs to change. To turn the button off, set `REVIEW_AMEND=off` and
+tell Claude "I left review notes on my-video, let's amend" instead.
+Claude changes only the flagged beats, sends them back for another look, and adds
 each note to the client's rules so you never give it twice.
 
 ## Make a motion-design showreel

@@ -144,6 +144,8 @@ Rules that came from mistakes:
 
 **Event thank-you / confirmation video (16:9, client):** for people who just signed up for a seminar or webinar. The goal is that they show up. Match the client's previous approved video in look and pacing so the series feels consistent. Name title for the first 4 s, captions throughout, one moving graphic per topic the speaker lists (only what they say: no added numbers, names, or claims), then an event card with day, date, time, and venue, checked against what the client confirms rather than the transcript (speech-to-text mishears venue names). Tighten pauses only; keep every word. Add music or a second CTA only when asked.
 
+**Slide report video (internal townhall, AI voice over slides and highlight clips):** keep slides perfectly still, with only a short fade in and out. A slow zoom on a text-heavy slide reads as the slide moving, not as polish. In the voiceover, name clients the way people say them (a person's name), never the acronyms from folder or file names. Say short labels as the slide writes them ("S4", not "Season 4"). The client's deck is the source of truth: when they send an updated deck, rebuild each changed slide from it, rewrite that slide's voiceover to match only what the slide lists, and re-time the section, not just the image.
+
 ## Checking the edit
 
 The agent checks its own work before you see it:
