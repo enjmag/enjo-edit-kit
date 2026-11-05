@@ -498,12 +498,14 @@ function indexHtml(projects) {
   const rows = projects.map((p, i) => {
     const s = summarize(p.review);
     const open = (p.review.comments ?? []).filter((c) => !c.done).length;
-    const info = p.mode === 'timeline' ? `${open} open comments` : `${s.approved} approved · ${s.change} to change · ${s.waiting} waiting`;
+    const st = { approved: '✓ Approved', sent: 'Amending…', amended: 'New draft ready', failed: 'Amend failed' }[p.review.amend?.state] ?? '';
+    const base = p.mode === 'timeline' ? `${open} open comment${open === 1 ? '' : 's'} · round ${p.review.round}` : `${s.approved} approved · ${s.change} to change · ${s.waiting} waiting`;
+    const info = st ? `${base} · <b>${st}</b>` : base;
     return `<li><a href="/p/${i}/">${esc(p.review.project)}</a> <span>${info}</span></li>`;
   }).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Review boards</title>
 <style>body{margin:0;padding:24px 16px;background:#101318;color:#e9edf2;font:16px/1.5 system-ui,Segoe UI,sans-serif}ul{list-style:none;padding:0;max-width:720px}li{background:#181c23;border:1px solid #2a303a;border-radius:10px;padding:12px 16px;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}a{color:#9fb4ff;font-weight:600}span{color:#93a0b0}</style></head>
-<body><h1>Review boards</h1><p>Open each video, leave your notes, then tell Claude which videos you reviewed.</p><ul>${rows}</ul></body></html>`;
+<body><h1>Review boards</h1><p>Open a video to comment on it, then approve it or send your notes for amend. Each video is amended on its own.</p><ul>${rows}</ul></body></html>`;
 }
 
 // ---------- server ----------
